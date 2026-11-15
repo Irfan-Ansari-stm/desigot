@@ -2,7 +2,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { User } from "@/types";
-import { apiPost, setAccessToken } from "@/lib/api";
+import { apiGet, apiPost, setAccessToken } from "@/lib/api";
 
 interface AuthStore {
   user: User | null;
@@ -14,9 +14,14 @@ interface AuthStore {
   register: (email: string, password: string, displayName: string, role?: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  fetchCurrentUser: () => Promise<User | null>;
   isAuthenticated: () => boolean;
   isSeller: () => boolean;
   isAdmin: () => boolean;
+  isSuperAdmin: () => boolean;
+  hasPermission: (permissionSlug: string) => boolean;
+  hasAnyPermission: (permissionSlugs: string[]) => boolean;
+  canAccessModule: (moduleSlug: string) => boolean;
 }
 
 export const useAuthStore = create<AuthStore>()(
@@ -74,14 +79,53 @@ export const useAuthStore = create<AuthStore>()(
           const data = await apiPost<{ accessToken: string }>("/auth/refresh", {});
           set({ accessToken: data.accessToken });
           setAccessToken(data.accessToken);
+          // Also fetch fresh profile and permissions
+          await get().fetchCurrentUser();
         } catch {
           set({ user: null, accessToken: null });
         }
       },
 
+      fetchCurrentUser: async () => {
+        try {
+          const user = await apiGet<User>("/auth/me");
+          set({ user });
+          return user;
+        } catch {
+          return null;
+        }
+      },
+
       isAuthenticated: () => !!get().user && !!get().accessToken,
       isSeller: () => ["seller", "admin", "superadmin"].includes(get().user?.role || ""),
-      isAdmin: () => ["admin", "superadmin"].includes(get().user?.role || ""),
+      isAdmin: () => ["admin", "superadmin"].includes(get().user?.role || "") || !!get().user?.is_super_admin,
+      isSuperAdmin: () => !!get().user?.is_super_admin || get().user?.role === "superadmin",
+
+      hasPermission: (permissionSlug: string) => {
+        const u = get().user;
+        if (!u) return false;
+        if (u.is_super_admin || u.role === "superadmin") return true;
+        if (!u.permissions || !Array.isArray(u.permissions)) return false;
+        return u.permissions.includes("*") || u.permissions.includes(permissionSlug);
+      },
+
+      hasAnyPermission: (permissionSlugs: string[]) => {
+        const u = get().user;
+        if (!u) return false;
+        if (u.is_super_admin || u.role === "superadmin") return true;
+        if (!u.permissions || !Array.isArray(u.permissions)) return false;
+        if (u.permissions.includes("*")) return true;
+        return permissionSlugs.some((p) => u.permissions?.includes(p));
+      },
+
+      canAccessModule: (moduleSlug: string) => {
+        const u = get().user;
+        if (!u) return false;
+        if (u.is_super_admin || u.role === "superadmin") return true;
+        if (!u.permissions || !Array.isArray(u.permissions)) return false;
+        if (u.permissions.includes("*")) return true;
+        return u.permissions.some((p) => p.startsWith(`${moduleSlug}.`));
+      },
     }),
     {
       name: "desigot-auth",

@@ -19,9 +19,13 @@ const authenticate = async (req, res, next) => {
 
     // Load fresh user from DB to catch suspensions / bans applied after token issue
     const { rows } = await query(
-      `SELECT id, email, role, account_status, seller_verified
-         FROM users
-        WHERE id = $1 AND deleted_at IS NULL`,
+      `SELECT u.id, u.email, u.username, u.display_name, u.first_name, u.last_name, u.phone,
+              u.role, u.is_super_admin, u.account_status, u.seller_verified, u.department_id, u.designation_id,
+              d.name AS department_name, des.title AS designation_title
+         FROM users u
+         LEFT JOIN departments d ON d.id = u.department_id
+         LEFT JOIN designations des ON des.id = u.designation_id
+        WHERE u.id = $1 AND u.deleted_at IS NULL`,
       [payload.sub]
     );
 
@@ -30,6 +34,14 @@ const authenticate = async (req, res, next) => {
     if (user.account_status === 'suspended' || user.account_status === 'banned') {
       throw new ForbiddenError(`Account is ${user.account_status}`);
     }
+
+    // Resolve full RBAC roles & permissions
+    const rbacService = require('../modules/rbac/rbac.service');
+    const effective = await rbacService.getUserEffectivePermissions(user.id);
+    user.is_super_admin = effective.isSuperAdmin || user.is_super_admin || user.role === 'superadmin';
+    user.roles = effective.roles;
+    user.permissions = effective.permissions;
+    user.hierarchyLevel = effective.hierarchyLevel;
 
     req.user = user;
     next();

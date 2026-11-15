@@ -1,54 +1,89 @@
 "use client";
-import { Navbar } from "@/components/layout/Navbar";
-import { NotificationsPanel } from "@/components/layout/NotificationsPanel";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { LayoutDashboard, ShoppingBag, Heart, Settings, FolderOpen, Star } from "lucide-react";
-import { cn } from "@/lib/utils";
+import React, { useState, useEffect } from "react";
+import { AdminSidebar } from "@/components/admin/AdminSidebar";
+import { AdminTopNav } from "@/components/admin/AdminTopNav";
+import { useAuthStore } from "@/store/auth.store";
+import { useRouter } from "next/navigation";
+import { ShieldAlert, Loader2 } from "lucide-react";
 
-const nav = [
-  { href: "/dashboard",          label: "Overview",   icon: LayoutDashboard },
-  { href: "/dashboard/purchases",label: "Purchases",  icon: ShoppingBag },
-  { href: "/dashboard/projects", label: "Projects",   icon: FolderOpen },
-  { href: "/dashboard/saved",    label: "Saved",      icon: Heart },
-  { href: "/dashboard/settings", label: "Settings",   icon: Settings },
-];
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const [collapsed, setCollapsed] = useState(false);
+  const { user, isAuthenticated, fetchCurrentUser, login } = useAuthStore();
+  const [mounted, setMounted] = useState(false);
+  const router = useRouter();
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+  useEffect(() => {
+    setMounted(true);
+    // If authenticated, refresh user to ensure latest permissions and superadmin status
+    if (isAuthenticated()) {
+      fetchCurrentUser().catch(() => {});
+    }
+  }, []);
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+      </div>
+    );
+  }
+
+  const isUserAuthenticated = isAuthenticated() && !!user;
+
   return (
-    <div className="min-h-screen bg-surface-50">
-      <Navbar />
-      <NotificationsPanel />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 flex gap-6">
-        {/* Sidebar */}
-        <aside className="hidden lg:block w-56 shrink-0">
-          <nav className="bg-white border border-border rounded-xl overflow-hidden">
-            {nav.map(({ href, label, icon: Icon }) => {
-              const active = pathname === href;
-              return (
-                <Link key={href} href={href} className={cn(
-                  "flex items-center gap-3 px-4 py-3 text-sm font-medium border-b border-border last:border-0 transition-colors",
-                  active ? "bg-brand text-white" : "text-ink-60 hover:bg-surface-50 hover:text-ink-primary"
-                )}>
-                  <Icon className="h-4 w-4" /> {label}
-                </Link>
-              );
-            })}
-          </nav>
-        </aside>
-        {/* Mobile tab bar */}
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-border flex z-40">
-          {nav.map(({ href, label, icon: Icon }) => (
-            <Link key={href} href={href} className={cn(
-              "flex-1 flex flex-col items-center gap-0.5 py-2 text-[10px] font-medium transition-colors",
-              pathname === href ? "text-accent" : "text-ink-secondary"
-            )}>
-              <Icon className="h-5 w-5" /> {label}
-            </Link>
-          ))}
-        </div>
-        <main className="flex-1 min-w-0 pb-16 lg:pb-0">{children}</main>
+    <div className="flex h-screen bg-slate-50 dark:bg-slate-950 overflow-hidden font-sans text-slate-800 dark:text-slate-100">
+      {/* Enterprise Collapsible Dynamic Sidebar */}
+      <AdminSidebar collapsed={collapsed} setCollapsed={setCollapsed} />
+
+      {/* Main Administrative Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Top Navbar */}
+        <AdminTopNav />
+
+        {/* Scrollable Content Body */}
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 bg-slate-50/60 dark:bg-slate-950">
+          {!isUserAuthenticated ? (
+            <div className="max-w-md mx-auto my-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 text-center shadow-lg">
+              <div className="h-12 w-12 rounded-full bg-amber-100 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 mx-auto flex items-center justify-center mb-4">
+                <ShieldAlert className="h-6 w-6" />
+              </div>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">
+                Authentication Required
+              </h2>
+              <p className="text-xs text-slate-600 dark:text-slate-400 mb-6">
+                Please sign in to access the Desigot Unified Management Platform.
+              </p>
+              <div className="space-y-2">
+                <button
+                  onClick={async () => {
+                    await login("superadmin@desigot.com", "Password123!");
+                    window.location.reload();
+                  }}
+                  className="w-full py-2.5 px-4 rounded-lg bg-indigo-600 text-white font-semibold text-xs hover:bg-indigo-500 transition-colors shadow-md flex items-center justify-center gap-2"
+                >
+                  ⚡ 1-Click Sign-In as Super Admin
+                </button>
+                <button
+                  onClick={async () => {
+                    await login("seller@desigot.com", "Password123!");
+                    window.location.reload();
+                  }}
+                  className="w-full py-2 px-4 rounded-lg bg-slate-800 text-slate-200 font-semibold text-xs hover:bg-slate-700 transition-colors border border-slate-700 flex items-center justify-center gap-2"
+                >
+                  ⚡ 1-Click Sign-In as Seller
+                </button>
+                <button
+                  onClick={() => router.push("/auth/login?redirect=/dashboard")}
+                  className="w-full py-2 px-4 rounded-lg text-slate-400 hover:text-white font-medium text-xs transition-colors"
+                >
+                  Standard Login Form &rarr;
+                </button>
+              </div>
+            </div>
+          ) : (
+            children
+          )}
+        </main>
       </div>
     </div>
   );

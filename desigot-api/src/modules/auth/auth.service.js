@@ -43,27 +43,64 @@ const register = async ({ email, password, display_name, role = 'buyer' }) => {
 // ── Login ────────────────────────────────────────────────────────────────────
 const login = async ({ email, password, totp_code, ip, userAgent }) => {
   const { rows } = await query(
-    `SELECT id, email, password_hash, role, account_status, failed_login_count,
-            locked_until, totp_enabled, totp_secret, seller_verified
-       FROM users WHERE email = $1 AND deleted_at IS NULL`,
+    `SELECT u.id, u.email, u.password_hash, u.username, u.display_name, u.first_name, u.last_name, u.phone,
+            u.role, u.is_super_admin, u.account_status, u.failed_login_count,
+            u.locked_until, u.totp_enabled, u.totp_secret, u.seller_verified,
+            u.department_id, u.designation_id, d.name AS department_name, des.title AS designation_title
+       FROM users u
+       LEFT JOIN departments d ON d.id = u.department_id
+       LEFT JOIN designations des ON des.id = u.designation_id
+      WHERE u.email = $1 AND u.deleted_at IS NULL`,
     [email]
   );
-  if (!rows.length) throw new UnauthorizedError('Invalid credentials');
+  if (!rows.length) {
+    await query(
+      `INSERT INTO login_history (email, ip_address, user_agent, status, failure_reason)
+       VALUES ($1, $2, $3, 'failed', 'User not found')`,
+      [email, ip, userAgent]
+    ).catch(() => {});
+    throw new UnauthorizedError('Invalid credentials');
+  }
 
   const user = rows[0];
-  if (user.account_status === 'banned') throw new ForbiddenError('Account banned');
+  if (user.account_status === 'banned') {
+    await query(
+      `INSERT INTO login_history (user_id, email, ip_address, user_agent, status, failure_reason)
+       VALUES ($1, $2, $3, $4, 'blocked', 'Account banned')`,
+      [user.id, email, ip, userAgent]
+    ).catch(() => {});
+    throw new ForbiddenError('Account is banned');
+  }
+  if (user.account_status === 'suspended') {
+    await query(
+      `INSERT INTO login_history (user_id, email, ip_address, user_agent, status, failure_reason)
+       VALUES ($1, $2, $3, $4, 'blocked', 'Account suspended')`,
+      [user.id, email, ip, userAgent]
+    ).catch(() => {});
+    throw new ForbiddenError('Account is currently suspended');
+  }
   if (user.locked_until && new Date(user.locked_until) > new Date()) {
+    await query(
+      `INSERT INTO login_history (user_id, email, ip_address, user_agent, status, failure_reason)
+       VALUES ($1, $2, $3, $4, 'blocked', 'Account locked')`,
+      [user.id, email, ip, userAgent]
+    ).catch(() => {});
     throw new ForbiddenError(`Account locked until ${user.locked_until}`);
   }
 
   const valid = await bcrypt.compare(password, user.password_hash || '');
   if (!valid) {
     const newCount = user.failed_login_count + 1;
-    const lockUntil = newCount >= 5 ? new Date(Date.now() + 30 * 60_000) : null;
+    const lockUntil = newCount >= 5 ? new Date(Date.now() + 15 * 60_000) : null;
     await query(
       `UPDATE users SET failed_login_count=$1, locked_until=$2 WHERE id=$3`,
       [newCount, lockUntil, user.id]
     );
+    await query(
+      `INSERT INTO login_history (user_id, email, ip_address, user_agent, status, failure_reason)
+       VALUES ($1, $2, $3, $4, 'failed', 'Invalid password')`,
+      [user.id, email, ip, userAgent]
+    ).catch(() => {});
     throw new UnauthorizedError('Invalid credentials');
   }
 
@@ -75,18 +112,122 @@ const login = async ({ email, password, totp_code, ip, userAgent }) => {
       token: totp_code,
       window: 1,
     });
-    if (!valid2fa) throw new UnauthorizedError('Invalid 2FA code');
+    if (!valid2fa) {
+      await query(
+        `INSERT INTO login_history (user_id, email, ip_address, user_agent, status, failure_reason)
+         VALUES ($1, $2, $3, $4, 'failed', 'Invalid 2FA code')`,
+        [user.id, email, ip, userAgent]
+      ).catch(() => {});
+      throw new UnauthorizedError('Invalid 2FA code');
+    }
   }
 
-  // Reset failed login counter
-  await query(`UPDATE users SET failed_login_count=0, locked_until=NULL, last_seen_at=NOW() WHERE id=$1`, [user.id]);
+  // Reset failed login counter and record last_login_at
+  await query(
+    `UPDATE users SET failed_login_count=0, locked_until=NULL, last_seen_at=NOW(), last_login_at=NOW() WHERE id=$1`,
+    [user.id]
+  );
+
+  // Record successful login in history
+  await query(
+    `INSERT INTO login_history (user_id, email, ip_address, user_agent, status)
+     VALUES ($1, $2, $3, $4, 'success')`,
+    [user.id, email, ip, userAgent]
+  ).catch(() => {});
 
   const accessToken  = signAccess(user.id, user.role);
   const refreshToken = signRefresh(user.id);
   await _storeRefreshToken(user.id, refreshToken, ip, userAgent);
 
+  // Resolve RBAC permissions
+  const rbacService = require('../rbac/rbac.service');
+  const effective = await rbacService.getUserEffectivePermissions(user.id);
+
   const { password_hash, totp_secret, ...safeUser } = user;
+  safeUser.is_super_admin = effective.isSuperAdmin || user.is_super_admin || user.role === 'superadmin';
+  safeUser.roles = effective.roles;
+  safeUser.permissions = effective.permissions;
+  safeUser.hierarchyLevel = effective.hierarchyLevel;
+
   return { user: safeUser, accessToken, refreshToken };
+};
+
+// ── Get Current Authenticated User (ME) ───────────────────────────────────────
+const getMe = async (userId) => {
+  const { rows } = await query(
+    `SELECT u.id, u.email, u.username, u.display_name, u.first_name, u.last_name, u.phone,
+            u.role, u.is_super_admin, u.account_status, u.avatar_url, u.bio,
+            u.totp_enabled, u.seller_verified, u.department_id, u.designation_id,
+            u.last_seen_at, u.last_login_at, u.created_at,
+            d.name AS department_name, des.title AS designation_title
+       FROM users u
+       LEFT JOIN departments d ON d.id = u.department_id
+       LEFT JOIN designations des ON des.id = u.designation_id
+      WHERE u.id = $1 AND u.deleted_at IS NULL`,
+    [userId]
+  );
+  if (!rows.length) throw new NotFoundError('User');
+  const user = rows[0];
+
+  const rbacService = require('../rbac/rbac.service');
+  const effective = await rbacService.getUserEffectivePermissions(user.id);
+  user.is_super_admin = effective.isSuperAdmin || user.is_super_admin || user.role === 'superadmin';
+  user.roles = effective.roles;
+  user.permissions = effective.permissions;
+  user.hierarchyLevel = effective.hierarchyLevel;
+
+  return user;
+};
+
+// ── Forgot Password ──────────────────────────────────────────────────────────
+const forgotPassword = async (email) => {
+  const { rows } = await query('SELECT id, email, display_name FROM users WHERE email = $1 AND deleted_at IS NULL', [email]);
+  if (!rows.length) {
+    // Return generic message to prevent email enumeration
+    return { message: 'If an account exists with that email, a password reset link has been dispatched.' };
+  }
+
+  const user = rows[0];
+  const resetToken = crypto.randomBytes(32).toString('hex');
+  const tokenHash = sha256(resetToken);
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+  await query(
+    `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+     VALUES ($1, $2, $3)`,
+    [user.id, tokenHash, expiresAt]
+  );
+
+  return {
+    message: 'If an account exists with that email, a password reset link has been dispatched.',
+    // In dev environment, return the reset token for ease of testing
+    resetToken: process.env.NODE_ENV !== 'production' ? resetToken : undefined,
+  };
+};
+
+// ── Reset Password ───────────────────────────────────────────────────────────
+const resetPassword = async (token, newPassword) => {
+  const tokenHash = sha256(token);
+  const { rows } = await query(
+    `SELECT id, user_id, expires_at, used_at
+       FROM password_reset_tokens
+      WHERE token_hash = $1
+        AND used_at IS NULL
+        AND expires_at > NOW()`,
+    [tokenHash]
+  );
+  if (!rows.length) throw new BadRequestError('Invalid or expired password reset token');
+
+  const { id: tokenId, user_id: userId } = rows[0];
+  const hash = await bcrypt.hash(newPassword, config.bcrypt.rounds);
+
+  await withTransaction(async (client) => {
+    await client.query(`UPDATE users SET password_hash = $1, failed_login_count = 0, locked_until = NULL, updated_at = NOW() WHERE id = $2`, [hash, userId]);
+    await client.query(`UPDATE password_reset_tokens SET used_at = NOW() WHERE id = $1`, [tokenId]);
+    await client.query(`UPDATE user_sessions SET revoked_at = NOW() WHERE user_id = $1`, [userId]);
+  });
+
+  return { message: 'Password has been reset successfully. Please log in with your new credentials.' };
 };
 
 // ── Refresh ──────────────────────────────────────────────────────────────────
@@ -234,6 +375,7 @@ const _storeRefreshToken = async (userId, token, ip, userAgent) => {
 };
 
 module.exports = {
-  register, login, refreshTokens, logout, logoutAll,
+  register, login, getMe, refreshTokens, logout, logoutAll,
   verifyEmail, setup2FA, confirm2FA, disable2FA, changePassword, oauthUpsert,
+  forgotPassword, resetPassword,
 };

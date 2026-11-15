@@ -27,6 +27,20 @@ const searchRoutes        = require('./modules/search/search.routes');
 const wishlistRoutes      = require('./modules/wishlists/wishlists.routes');
 const adminRoutes         = require('./modules/admin/admin.routes');
 const analyticsRoutes     = require('./modules/analytics/analytics.routes');
+const dashboardAnalyticsRoutes = require('./modules/dashboard-analytics/dashboard-analytics.routes');
+const rbacRoutes          = require('./modules/rbac/rbac.routes');
+const rolesRoutes         = require('./modules/rbac/roles.routes');
+const permissionsRoutes   = require('./modules/rbac/permissions.routes');
+const accessControlRoutes = require('./modules/rbac/access-control.routes');
+const auditRoutes         = require('./modules/rbac/audit.routes');
+const systemRoutes        = require('./modules/rbac/system.routes');
+const serviceManagementRoutes = require('./modules/service-management/service-management.routes');
+const publicServicesRoutes    = require('./modules/service-management/public-services.routes');
+const digitalProductsRoutes   = require('./modules/digital-products/digital-products.routes');
+const customerManagementRoutes = require('./modules/customer-management/customer-management.routes');
+const ordersBookingsRoutes     = require('./modules/orders-bookings/orders-bookings.routes');
+const categoriesTaxonomyRoutes = require('./modules/categories/categories-taxonomy.routes');
+const paymentsFinanceRoutes    = require('./modules/payments/payments-finance.routes');
 
 const createApp = () => {
   const app = express();
@@ -101,8 +115,32 @@ const createApp = () => {
   app.use(`${v1}/notifications`, notificationRoutes);
   app.use(`${v1}/search`,        searchRoutes);
   app.use(`${v1}/wishlists`,     wishlistRoutes);
+  app.use(`${v1}/admin/services`,           serviceManagementRoutes);
+  app.use(`${v1}/admin/service-management`, serviceManagementRoutes);
+  app.use(`${v1}/public/services`,          publicServicesRoutes);
+  app.use(`${v1}/admin/digital-products`,   digitalProductsRoutes);
+  app.use(`${v1}/admin/products`,           digitalProductsRoutes);
+  app.use(`${v1}/admin/customers`,          customerManagementRoutes);
+  app.use(`${v1}/admin/customer-management`,customerManagementRoutes);
+  app.use(`${v1}/admin/orders-bookings`,    ordersBookingsRoutes);
+  app.use(`${v1}/admin/orders`,             ordersBookingsRoutes);
+  app.use(`${v1}/admin/bookings`,           ordersBookingsRoutes);
+  app.use(`${v1}/admin/categories-taxonomy`,categoriesTaxonomyRoutes);
+  app.use(`${v1}/admin/categories`,         categoriesTaxonomyRoutes);
+  app.use(`${v1}/admin/finance`,             paymentsFinanceRoutes);
+  app.use(`${v1}/admin/payments-finance`,     paymentsFinanceRoutes);
+  app.use(`${v1}/admin/dashboard`, dashboardAnalyticsRoutes);
+  app.use(`${v1}/admin/analytics`, dashboardAnalyticsRoutes);
+  app.use(`${v1}/admin`,         dashboardAnalyticsRoutes);
   app.use(`${v1}/admin`,         adminRoutes);
+  app.use(`${v1}/analytics`,     dashboardAnalyticsRoutes);
   app.use(`${v1}/analytics`,     analyticsRoutes);
+  app.use(`${v1}/rbac`,          rbacRoutes);
+  app.use(`${v1}/roles`,         rolesRoutes);
+  app.use(`${v1}/permissions`,   permissionsRoutes);
+  app.use(`${v1}/access-control`,accessControlRoutes);
+  app.use(`${v1}/audit-logs`,    auditRoutes);
+  app.use(`${v1}/system`,        systemRoutes);
 
   // ── API root ──────────────────────────────────────────────────────────────────
   app.get(`/api/${config.apiVersion}`, (req, res) =>

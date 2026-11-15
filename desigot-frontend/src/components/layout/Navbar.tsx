@@ -2,12 +2,11 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Bell, Heart, Menu, X, ChevronDown, Plus, LogOut, Settings, LayoutDashboard, ShoppingBag, Star } from "lucide-react";
+import { Search, Bell, Menu, X, ChevronDown, Plus, LogOut, LayoutDashboard, Star } from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
 import { useUIStore } from "@/store/ui.store";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
 import { useCategoryTree } from "@/hooks/useListings";
 import { cn } from "@/lib/utils";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
@@ -120,21 +119,16 @@ export function Navbar() {
                     <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-accent rounded-full" />
                   )}
                 </button>
-                <Link href="/dashboard/saved" className="hidden sm:flex p-2 rounded-lg hover:bg-surface-50 text-ink-secondary transition-colors">
-                  <Heart className="h-5 w-5" />
-                </Link>
-                {isSeller() && (
-                  <Button
-                    variant="accent"
-                    size="sm"
-                    leftIcon={<Plus className="h-3.5 w-3.5" />}
-                    onClick={() => router.push("/seller-dashboard/listings/new")}
-                    className="hidden sm:flex"
-                  >
-                    Sell
-                  </Button>
-                )}
-                <UserMenu user={user!} onLogout={logout} isSeller={isSeller()} />
+                <Button
+                  variant="accent"
+                  size="sm"
+                  leftIcon={<Plus className="h-3.5 w-3.5" />}
+                  onClick={() => router.push("/dashboard/listings/new")}
+                  className="hidden sm:flex"
+                >
+                  Sell
+                </Button>
+                <UserMenu user={user!} onLogout={logout} />
               </>
             ) : (
               <>
@@ -177,6 +171,7 @@ export function Navbar() {
                 { href: "/browse?listing_type=service", label: "Services" },
                 { href: "/search", label: "Search" },
                 { href: "/browse?sort=popular", label: "Trending" },
+                { href: "/dashboard", label: "Dashboard" },
               ].map((item) => (
                 <Link
                   key={item.href}
@@ -208,7 +203,7 @@ export function Navbar() {
   );
 }
 
-function UserMenu({ user, onLogout, isSeller }: { user: { display_name: string; avatar_url?: string; email: string }; onLogout: () => void; isSeller: boolean }) {
+function UserMenu({ user, onLogout }: { user: { display_name: string; avatar_url?: string; email: string }; onLogout: () => void }) {
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
@@ -223,11 +218,7 @@ function UserMenu({ user, onLogout, isSeller }: { user: { display_name: string; 
             <p className="text-xs text-ink-secondary truncate">{user.email}</p>
           </div>
           {[
-            { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
-            { href: "/dashboard/purchases", label: "My Purchases", icon: <ShoppingBag className="h-4 w-4" /> },
-            { href: "/dashboard/saved", label: "Saved Items", icon: <Heart className="h-4 w-4" /> },
-            ...(isSeller ? [{ href: "/seller-dashboard", label: "Seller Dashboard", icon: <Star className="h-4 w-4" /> }] : []),
-            { href: "/dashboard/settings", label: "Settings", icon: <Settings className="h-4 w-4" /> },
+            { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4 text-brand" /> },
           ].map((item) => (
             <DropdownMenu.Item key={item.href} asChild>
               <Link href={item.href} className="flex items-center gap-2.5 px-3 py-2 text-sm text-ink-60 hover:bg-surface-50 hover:text-ink-primary cursor-pointer outline-none">

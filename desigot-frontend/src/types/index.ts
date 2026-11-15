@@ -1,12 +1,25 @@
+export * from './rbac';
+
 // ── Auth ──────────────────────────────────────────────────────────────────────
 export interface User {
   id: string;
   email: string;
   display_name: string;
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
   username?: string;
   avatar_url?: string;
   bio?: string;
-  role: "buyer" | "seller" | "admin" | "superadmin";
+  role: "buyer" | "seller" | "admin" | "superadmin" | "standard";
+  is_super_admin?: boolean;
+  department_id?: string;
+  designation_id?: string;
+  department_name?: string;
+  designation_title?: string;
+  roles?: Array<{ id: string; name: string; slug: string; hierarchy_level: number }>;
+  permissions?: string[];
+  hierarchyLevel?: number;
   account_status: "active" | "suspended" | "banned" | "pending_verification";
   seller_verified: boolean;
   seller_type?: "freelancer" | "agency" | "studio";
@@ -17,6 +30,7 @@ export interface User {
   email_verified_at?: string;
   created_at: string;
   last_seen_at?: string;
+  last_login_at?: string;
 }
 
 export interface AuthState {

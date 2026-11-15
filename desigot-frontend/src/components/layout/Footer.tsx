@@ -2,7 +2,7 @@ import Link from "next/link";
 
 const sections = [
   { title: "Marketplace", links: [{ label: "Browse Assets", href: "/browse?listing_type=asset" }, { label: "Browse Services", href: "/browse?listing_type=service" }, { label: "Featured", href: "/browse?is_featured=true" }, { label: "Trending", href: "/browse?sort=popular" }, { label: "Collections", href: "/collections" }] },
-  { title: "Sellers", links: [{ label: "Start Selling", href: "/auth/register?role=seller" }, { label: "Pricing Plans", href: "/seller-dashboard/settings#plan" }, { label: "Seller Dashboard", href: "/seller-dashboard" }, { label: "Seller Guidelines", href: "#" }] },
+  { title: "Sellers", links: [{ label: "Start Selling", href: "/auth/register?role=seller" }, { label: "Pricing Plans", href: "/dashboard/system/general?tab=pricing" }, { label: "Management Dashboard", href: "/dashboard" }, { label: "Seller Guidelines", href: "#" }] },
   { title: "Company", links: [{ label: "About Us", href: "#" }, { label: "Blog", href: "#" }, { label: "Careers", href: "#" }, { label: "Press", href: "#" }, { label: "Enterprise", href: "#" }] },
   { title: "Support", links: [{ label: "Help Center", href: "#" }, { label: "Dispute Policy", href: "#" }, { label: "License Guide", href: "#" }, { label: "Contact Us", href: "#" }, { label: "Status", href: "#" }] },
 ];

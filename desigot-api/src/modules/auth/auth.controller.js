@@ -74,4 +74,23 @@ const oauthCallback = async (req, res) => {
   return successResponse(res, { accessToken: result.accessToken, userId: result.userId, role: result.role });
 };
 
-module.exports = { register, login, refresh, logout, logoutAll, verifyEmail, setup2FA, confirm2FA, disable2FA, changePassword, oauthCallback };
+const me = async (req, res) => {
+  const user = await authService.getMe(req.user.id);
+  return successResponse(res, user);
+};
+
+const forgotPassword = async (req, res) => {
+  const result = await authService.forgotPassword(req.body.email);
+  return successResponse(res, result);
+};
+
+const resetPassword = async (req, res) => {
+  const result = await authService.resetPassword(req.body.token, req.body.new_password);
+  return successResponse(res, result);
+};
+
+module.exports = {
+  register, login, me, refresh, logout, logoutAll,
+  verifyEmail, setup2FA, confirm2FA, disable2FA, changePassword, oauthCallback,
+  forgotPassword, resetPassword,
+};

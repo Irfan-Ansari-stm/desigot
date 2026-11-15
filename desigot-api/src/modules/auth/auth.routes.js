@@ -24,8 +24,11 @@ router.post('/login',
   ctrl.login
 );
 
+router.get('/me', authenticate, ctrl.me);
 router.post('/refresh',   ctrl.refresh);
 router.post('/logout',    ctrl.logout);
+router.post('/forgot-password', authLimiter, body('email').isEmail().normalizeEmail(), validate, ctrl.forgotPassword);
+router.post('/reset-password',  authLimiter, body('token').notEmpty(), body('new_password').isLength({ min: 8 }), validate, ctrl.resetPassword);
 router.post('/logout-all', authenticate, ctrl.logoutAll);
 router.post('/verify-email', authenticate, ctrl.verifyEmail);
 

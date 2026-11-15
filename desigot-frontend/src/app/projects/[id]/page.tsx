@@ -14,7 +14,7 @@ import { Modal } from "@/components/ui/Modal";
 import { formatPrice, formatDate, timeAgo, cn } from "@/lib/utils";
 import { toast } from "@/store/ui.store";
 import { getErrorMessage } from "@/lib/api";
-import { Send, Upload, CheckCircle, Clock, DollarSign, FileText, MessageSquare, Paperclip, Pin } from "lucide-react";
+import { Send, Upload, CheckCircle, Clock, DollarSign, FileText, MessageSquare, Paperclip, Pin, ShieldCheck, AlertTriangle, Scale, CheckCircle2, X } from "lucide-react";
 import type { Milestone } from "@/types";
 
 export default function ProjectPage() {
@@ -30,7 +30,11 @@ export default function ProjectPage() {
   const uploadFile       = useUploadProjectFile();
 
   const [msg, setMsg]       = useState("");
-  const [activeTab, setActiveTab] = useState<"messages" | "files" | "milestones">("messages");
+  const [activeTab, setActiveTab] = useState<"messages" | "files" | "milestones" | "contract">("messages");
+  const [isRevisionModalOpen, setIsRevisionModalOpen] = useState(false);
+  const [revisionNotes, setRevisionNotes] = useState("");
+  const [isDisputeModalOpen, setIsDisputeModalOpen] = useState(false);
+  const [disputeReason, setDisputeReason] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const messages = (msgData as { data: import("@/types").ProjectMessage[] } | undefined)?.data || [];
@@ -127,8 +131,9 @@ export default function ProjectPage() {
                 { key: "messages", label: "Messages", icon: <MessageSquare className="h-4 w-4" />, count: messages.length },
                 { key: "files",    label: "Files",    icon: <Paperclip className="h-4 w-4" />,    count: files.length },
                 { key: "milestones",label:"Milestones",icon:<CheckCircle className="h-4 w-4" />,  count: totalMilestones },
+                { key: "contract",  label:"Contract & Terms", icon:<ShieldCheck className="h-4 w-4" />, count: 0 },
               ].map((tab) => (
-                <button key={tab.key} onClick={() => setActiveTab(tab.key as "messages"|"files"|"milestones")}
+                <button key={tab.key} onClick={() => setActiveTab(tab.key as any)}
                   className={cn("flex-1 flex items-center justify-center gap-1.5 py-2 text-sm font-medium rounded-lg transition-colors",
                     activeTab === tab.key ? "bg-brand text-white" : "text-ink-secondary hover:text-ink-primary")}>
                   {tab.icon} {tab.label}
@@ -221,6 +226,54 @@ export default function ProjectPage() {
                 ))}
               </div>
             )}
+
+            {/* Contract & Escrow tab (F-M07-07) */}
+            {activeTab === "contract" && (
+              <Card className="space-y-5">
+                <div className="flex items-center justify-between pb-4 border-b border-border">
+                  <div>
+                    <h3 className="text-base font-bold text-ink-primary flex items-center gap-2">
+                      <ShieldCheck className="h-5 w-5 text-success" />
+                      Binding Digital Service Agreement
+                    </h3>
+                    <p className="text-xs text-ink-secondary mt-0.5">
+                      Contract Ref: DSGT-PRJ-{id.substring(0, 8).toUpperCase()} · Governing Law: US Commercial Code
+                    </p>
+                  </div>
+                  <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 font-semibold text-xs rounded-full border border-emerald-200">
+                    Active & Escrow Protected
+                  </span>
+                </div>
+
+                <div className="space-y-3 text-xs leading-relaxed text-ink-60">
+                  <div className="p-3 bg-surface-50 rounded-xl space-y-1.5">
+                    <p className="font-semibold text-ink-primary">1. Intellectual Property (IP) Transfer</p>
+                    <p>
+                      Upon approval of the final milestone and release of funds from escrow, all worldwide copyright, design rights, and intellectual property in the custom deliverables transfer fully to the Buyer without royalty restrictions.
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-surface-50 rounded-xl space-y-1.5">
+                    <p className="font-semibold text-ink-primary">2. Stripe Escrow Protection Guarantee</p>
+                    <p>
+                      Project funds ({formatPrice(project.total_budget_cents)}) are held in regulated escrow. Milestone disbursements occur strictly upon affirmative Buyer approval. If an unresolved conflict arises, either party may invoke Desigot Dispute Adjudication.
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-surface-50 rounded-xl space-y-1.5">
+                    <p className="font-semibold text-ink-primary">3. Scope & Revision Cap</p>
+                    <p>
+                      The Seller provides up to {project.revision_limit || 3} revision cycles within the scope defined in the agreed milestones. Revisions requested beyond this quota require supplemental milestone approval.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-border flex items-center justify-between text-xs text-ink-secondary">
+                  <span>Buyer: {project.buyer_name} (Digitally Signed)</span>
+                  <span>Seller: {project.seller_name} (Digitally Signed)</span>
+                </div>
+              </Card>
+            )}
           </div>
 
           {/* Sidebar */}
@@ -230,11 +283,30 @@ export default function ProjectPage() {
               <StatusBadge status={project.status} />
               <div className="mt-4 space-y-2">
                 {isBuyer && project.status === "active" && (
-                  <Button variant="secondary" size="sm" fullWidth onClick={() => updateStatus.mutate({ id, status: "in_revision" })}>Request Revision</Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    fullWidth
+                    onClick={() => setIsRevisionModalOpen(true)}
+                  >
+                    Request Revision ({project.revision_limit - project.revisions_used} left)
+                  </Button>
                 )}
                 {isBuyer && ["active", "in_revision"].includes(project.status) && (
                   <Button variant="primary" size="sm" fullWidth onClick={() => { if (confirm("Mark this project as complete?")) updateStatus.mutate({ id, status: "complete" }); }}>
                     Mark Complete
+                  </Button>
+                )}
+                {["active", "in_revision"].includes(project.status) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    fullWidth
+                    className="text-danger hover:bg-red-50 text-xs"
+                    onClick={() => setIsDisputeModalOpen(true)}
+                  >
+                    <AlertTriangle className="h-3.5 w-3.5 mr-1" />
+                    Open Dispute / Mediate
                   </Button>
                 )}
               </div>
@@ -251,6 +323,106 @@ export default function ProjectPage() {
           </div>
         </div>
       </main>
+
+      {/* Revision Request Modal (F-M07-04) */}
+      {isRevisionModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <div>
+                <h3 className="text-base font-bold text-ink-primary">Submit Revision Request</h3>
+                <p className="text-xs text-ink-secondary">Revision {project.revisions_used + 1} of {project.revision_limit}</p>
+              </div>
+              <button onClick={() => setIsRevisionModalOpen(false)} className="p-1.5 rounded-lg hover:bg-surface-50 text-ink-secondary">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-ink-primary mb-1">
+                Detailed Feedback & Modification Instructions
+              </label>
+              <textarea
+                rows={4}
+                value={revisionNotes}
+                onChange={(e) => setRevisionNotes(e.target.value)}
+                placeholder="Be specific about typography, layout adjustments, color tweaks, or missing components..."
+                className="w-full text-sm bg-surface-50 border border-border rounded-xl p-3 outline-none focus:ring-2 focus:ring-accent/40"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="ghost" size="sm" onClick={() => setIsRevisionModalOpen(false)}>Cancel</Button>
+              <Button
+                variant="accent"
+                size="sm"
+                onClick={async () => {
+                  if (!revisionNotes.trim()) { toast.error("Please enter revision instructions"); return; }
+                  try {
+                    await updateStatus.mutateAsync({ id, status: "in_revision" });
+                    await sendMessage.mutateAsync({ projectId: id, content: `[REVISION REQUEST]: ${revisionNotes}` });
+                    toast.success("Revision request submitted to seller!");
+                    setIsRevisionModalOpen(false);
+                    setRevisionNotes("");
+                  } catch (err) { toast.error(getErrorMessage(err)); }
+                }}
+              >
+                Submit Revision
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dispute Mediation Modal (F-M07-09) */}
+      {isDisputeModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <div className="flex items-center gap-2 text-danger">
+                <AlertTriangle className="h-5 w-5" />
+                <h3 className="text-base font-bold text-ink-primary">Escalate to Desigot Mediation</h3>
+              </div>
+              <button onClick={() => setIsDisputeModalOpen(false)} className="p-1.5 rounded-lg hover:bg-surface-50 text-ink-secondary">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="text-xs text-ink-secondary">
+              Escalating freezes all escrow funds immediately. A Desigot Operations Specialist will inspect project messages, milestone files, and adjudicate within 5 business days.
+            </p>
+            <div>
+              <label className="block text-xs font-semibold text-ink-primary mb-1">
+                Dispute Reason & Evidence
+              </label>
+              <textarea
+                rows={4}
+                value={disputeReason}
+                onChange={(e) => setDisputeReason(e.target.value)}
+                placeholder="Explain the breach of contract, missed deadline, non-responsive counterparty, or deliverable mismatch..."
+                className="w-full text-sm bg-surface-50 border border-border rounded-xl p-3 outline-none focus:ring-2 focus:ring-accent/40"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="ghost" size="sm" onClick={() => setIsDisputeModalOpen(false)}>Cancel</Button>
+              <Button
+                variant="accent"
+                size="sm"
+                className="bg-danger hover:bg-red-700 text-white"
+                onClick={async () => {
+                  if (!disputeReason.trim()) { toast.error("Please provide dispute reason"); return; }
+                  try {
+                    await updateStatus.mutateAsync({ id, status: "disputed" });
+                    await sendMessage.mutateAsync({ projectId: id, content: `[DISPUTE OPENED]: ${disputeReason}` });
+                    toast.success("Dispute filed! Escrow frozen and Operations notified.");
+                    setIsDisputeModalOpen(false);
+                    setDisputeReason("");
+                  } catch (err) { toast.error(getErrorMessage(err)); }
+                }}
+              >
+                Confirm Escalation
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
