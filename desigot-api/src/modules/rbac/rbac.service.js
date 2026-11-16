@@ -1295,21 +1295,44 @@ const getLoginHistory = async ({ userId, status, page = 1, limit = 20 }) => {
 
 const getActiveSessions = async ({ page = 1, limit = 20 }) => {
   const offset = (page - 1) * limit;
-  const countRes = await query(
-    `SELECT COUNT(*) FROM user_sessions WHERE revoked_at IS NULL AND expires_at > NOW()`
-  );
-  const total = parseInt(countRes.rows[0].count, 10);
 
-  const { rows } = await query(
-    `SELECT s.id, s.user_id, s.ip_address, s.device_info, s.last_used_at, s.expires_at, s.created_at,
-            u.display_name, u.email, u.role, u.is_super_admin
-       FROM user_sessions s
-       JOIN users u ON u.id = s.user_id
-      WHERE s.revoked_at IS NULL AND s.expires_at > NOW()
-      ORDER BY s.last_used_at DESC
-      LIMIT $1 OFFSET $2`,
-    [limit, offset]
+  // Check admin_sessions count first
+  let countRes = await query(
+    `SELECT COUNT(*) FROM admin_sessions WHERE is_revoked = FALSE AND expires_at > NOW()`
   );
+  let total = parseInt(countRes.rows[0].count, 10);
+  let rows = [];
+
+  if (total > 0) {
+    const res = await query(
+      `SELECT s.id, s.user_id, s.ip_address, s.device, s.browser, s.os, s.location, s.is_current,
+              s.last_activity_at as last_used_at, s.expires_at, s.created_at,
+              u.display_name, u.email, u.role, u.is_super_admin
+         FROM admin_sessions s
+         JOIN users u ON u.id = s.user_id
+        WHERE s.is_revoked = FALSE AND s.expires_at > NOW()
+        ORDER BY s.last_activity_at DESC
+        LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
+    rows = res.rows;
+  } else {
+    countRes = await query(
+      `SELECT COUNT(*) FROM user_sessions WHERE revoked_at IS NULL AND expires_at > NOW()`
+    );
+    total = parseInt(countRes.rows[0].count, 10);
+    const res = await query(
+      `SELECT s.id, s.user_id, s.ip_address, s.device_info, s.last_used_at, s.expires_at, s.created_at,
+              u.display_name, u.email, u.role, u.is_super_admin
+         FROM user_sessions s
+         JOIN users u ON u.id = s.user_id
+        WHERE s.revoked_at IS NULL AND s.expires_at > NOW()
+        ORDER BY s.last_used_at DESC
+        LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
+    rows = res.rows;
+  }
 
   return {
     sessions: rows,
@@ -1318,8 +1341,11 @@ const getActiveSessions = async ({ page = 1, limit = 20 }) => {
 };
 
 const revokeSession = async (sessionId, actorId) => {
-  await query(`UPDATE user_sessions SET revoked_at = NOW() WHERE id = $1`, [sessionId]);
-  await logAuditEvent({ actorId, action: 'session.revoke', entityType: 'user_session', entityId: sessionId });
+  await query(`UPDATE admin_sessions SET is_revoked = TRUE WHERE id = $1`, [sessionId]);
+  try {
+    await query(`UPDATE user_sessions SET revoked_at = NOW() WHERE id = $1`, [sessionId]);
+  } catch (e) {}
+  await logAuditEvent({ actorId, action: 'session.revoke', entityType: 'session', entityId: sessionId });
   return { message: 'Session revoked successfully.' };
 };
 
@@ -1618,6 +1644,295 @@ const updateEmailTemplate = async (id, data, actorId) => {
   return res.rows[0];
 };
 
+// ── MODULE ACCESS ────────────────────────────────────────────────────────────
+const getModuleAccess = async () => {
+  const rolesRes = await query(
+    `SELECT id, name, slug, hierarchy_level, is_system FROM roles WHERE is_active = TRUE ORDER BY hierarchy_level ASC`
+  );
+  const modulesRes = await query(
+    `SELECT id, name, slug, description, icon, display_order FROM modules ORDER BY display_order ASC`
+  );
+  const accessRes = await query(
+    `SELECT role_id, module_id, access_level, is_accessible FROM role_modules`
+  );
+
+  const accessMap = {};
+  for (const row of accessRes.rows) {
+    accessMap[`${row.role_id}_${row.module_id}`] = {
+      access_level: row.access_level,
+      is_accessible: row.is_accessible,
+    };
+  }
+
+  return {
+    roles: rolesRes.rows,
+    modules: modulesRes.rows,
+    access: accessMap,
+  };
+};
+
+const updateModuleAccess = async (updates, actorId) => {
+  if (!Array.isArray(updates) || !updates.length) {
+    throw new BadRequestError('Updates array required');
+  }
+
+  await withTransaction(async (client) => {
+    for (const u of updates) {
+      // Super admin role access cannot be modified
+      const role = await client.query(`SELECT slug FROM roles WHERE id = $1`, [u.roleId]);
+      if (role.rows.length && role.rows[0].slug === 'superadmin') {
+        continue;
+      }
+
+      await client.query(
+        `INSERT INTO role_modules (role_id, module_id, access_level, is_accessible, updated_at)
+         VALUES ($1, $2, $3, $4, NOW())
+         ON CONFLICT (role_id, module_id) DO UPDATE SET
+           access_level = EXCLUDED.access_level,
+           is_accessible = EXCLUDED.is_accessible,
+           updated_at = NOW()`,
+        [u.roleId, u.moduleId, u.accessLevel || 'read', u.isAccessible !== false]
+      );
+    }
+  });
+
+  await logAuditEvent({ actorId, action: 'rbac.module_access_update', entityType: 'role_modules', metadata: { count: updates.length } });
+  return { message: 'Module access policies updated successfully.' };
+};
+
+// ── API PERMISSIONS ──────────────────────────────────────────────────────────
+const getApiPermissions = async ({ search, module: modFilter, method } = {}) => {
+  let sql = `SELECT * FROM api_route_permissions WHERE 1=1`;
+  const params = [];
+
+  if (search) {
+    params.push(`%${search}%`);
+    sql += ` AND (endpoint ILIKE $${params.length} OR description ILIKE $${params.length} OR required_permission ILIKE $${params.length})`;
+  }
+  if (modFilter) {
+    params.push(modFilter);
+    sql += ` AND module = $${params.length}`;
+  }
+  if (method) {
+    params.push(method.toUpperCase());
+    sql += ` AND method = $${params.length}`;
+  }
+
+  sql += ` ORDER BY module ASC, method ASC, endpoint ASC`;
+  const { rows } = await query(sql, params);
+  return rows;
+};
+
+const createApiPermission = async (data, actorId) => {
+  const { module: modName, method, endpoint, required_permission, description } = data;
+  if (!modName || !method || !endpoint) throw new BadRequestError('Module, method, and endpoint are required');
+
+  const { rows } = await query(
+    `INSERT INTO api_route_permissions (module, method, endpoint, required_permission, description)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (method, endpoint) DO UPDATE SET
+       module = EXCLUDED.module,
+       required_permission = EXCLUDED.required_permission,
+       description = EXCLUDED.description,
+       updated_at = NOW()
+     RETURNING *`,
+    [modName, method.toUpperCase(), endpoint, required_permission || null, description || null]
+  );
+  await logAuditEvent({ actorId, action: 'api_permission.create', entityType: 'api_route', entityId: rows[0].id });
+  return rows[0];
+};
+
+const updateApiPermission = async (id, data, actorId) => {
+  const { module: modName, method, endpoint, required_permission, description, is_protected } = data;
+  const { rows } = await query(
+    `UPDATE api_route_permissions
+        SET module = COALESCE($1, module),
+            method = COALESCE($2, method),
+            endpoint = COALESCE($3, endpoint),
+            required_permission = COALESCE($4, required_permission),
+            description = COALESCE($5, description),
+            is_protected = COALESCE($6, is_protected),
+            updated_at = NOW()
+      WHERE id = $7
+      RETURNING *`,
+    [modName, method ? method.toUpperCase() : null, endpoint, required_permission, description, is_protected, id]
+  );
+  if (!rows.length) throw new NotFoundError('API Route Permission');
+  await logAuditEvent({ actorId, action: 'api_permission.update', entityType: 'api_route', entityId: id });
+  return rows[0];
+};
+
+const deleteApiPermission = async (id, actorId) => {
+  const { rowCount } = await query(`DELETE FROM api_route_permissions WHERE id = $1`, [id]);
+  if (!rowCount) throw new NotFoundError('API Route Permission');
+  await logAuditEvent({ actorId, action: 'api_permission.delete', entityType: 'api_route', entityId: id });
+  return { message: 'API permission route deleted successfully.' };
+};
+
+// ── ADMIN ACTIVITY LOGS ──────────────────────────────────────────────────────
+const getAdminActivityLogs = async ({ userId, module: modFilter, action, startDate, endDate, page = 1, limit = 25 } = {}) => {
+  const offset = (page - 1) * limit;
+  let countSql = `SELECT COUNT(*) FROM admin_activity_logs WHERE 1=1`;
+  let dataSql = `
+    SELECT a.*, u.display_name, u.email, u.avatar_url, u.role
+      FROM admin_activity_logs a
+      LEFT JOIN users u ON u.id = a.user_id
+     WHERE 1=1
+  `;
+  const params = [];
+
+  if (userId) {
+    params.push(userId);
+    countSql += ` AND user_id = $${params.length}`;
+    dataSql += ` AND a.user_id = $${params.length}`;
+  }
+  if (modFilter) {
+    params.push(modFilter);
+    countSql += ` AND module = $${params.length}`;
+    dataSql += ` AND a.module = $${params.length}`;
+  }
+  if (action) {
+    params.push(`%${action}%`);
+    countSql += ` AND action ILIKE $${params.length}`;
+    dataSql += ` AND a.action ILIKE $${params.length}`;
+  }
+  if (startDate) {
+    params.push(startDate);
+    countSql += ` AND created_at >= $${params.length}`;
+    dataSql += ` AND a.created_at >= $${params.length}`;
+  }
+  if (endDate) {
+    params.push(endDate);
+    countSql += ` AND created_at <= $${params.length}`;
+    dataSql += ` AND a.created_at <= $${params.length}`;
+  }
+
+  const countRes = await query(countSql, params);
+  const total = parseInt(countRes.rows[0].count, 10);
+
+  dataSql += ` ORDER BY a.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+  const { rows } = await query(dataSql, [...params, limit, offset]);
+
+  return {
+    activity: rows,
+    pagination: { page: parseInt(page, 10), limit: parseInt(limit, 10), total, totalPages: Math.ceil(total / limit) },
+  };
+};
+
+// ── SECURITY SETTINGS ────────────────────────────────────────────────────────
+const getSecuritySettings = async () => {
+  const { rows } = await query(`SELECT * FROM security_settings ORDER BY category ASC, setting_key ASC`);
+  const settingsObj = {};
+  for (const r of rows) {
+    settingsObj[r.setting_key] = {
+      id: r.id,
+      category: r.category,
+      value: r.setting_value,
+      description: r.description,
+      updated_at: r.updated_at,
+    };
+  }
+  return settingsObj;
+};
+
+const updateSecuritySettings = async (settingsUpdates, actorId) => {
+  if (typeof settingsUpdates !== 'object' || settingsUpdates === null) {
+    throw new BadRequestError('Settings object is required');
+  }
+
+  for (const [key, val] of Object.entries(settingsUpdates)) {
+    await query(
+      `INSERT INTO security_settings (setting_key, setting_value, updated_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (setting_key) DO UPDATE SET
+         setting_value = EXCLUDED.setting_value,
+         updated_at = NOW()`,
+      [key, JSON.stringify(val)]
+    );
+  }
+
+  await logAuditEvent({ actorId, action: 'security.settings_update', entityType: 'security_settings', metadata: { keys: Object.keys(settingsUpdates) } });
+  return { message: 'Security settings updated successfully.' };
+};
+
+// ── ROLE ASSIGNMENTS ─────────────────────────────────────────────────────────
+const getUserRoleAssignments = async ({ userId, roleId, page = 1, limit = 25 } = {}) => {
+  const offset = (page - 1) * limit;
+  let countSql = `SELECT COUNT(*) FROM user_roles ur JOIN users u ON u.id = ur.user_id WHERE u.deleted_at IS NULL`;
+  let dataSql = `
+    SELECT ur.id as assignment_id, ur.user_id, ur.role_id, ur.is_primary, ur.expires_at, ur.assigned_at,
+           u.display_name, u.email, u.avatar_url, u.account_status,
+           r.name as role_name, r.slug as role_slug, r.hierarchy_level
+      FROM user_roles ur
+      JOIN users u ON u.id = ur.user_id
+      JOIN roles r ON r.id = ur.role_id
+     WHERE u.deleted_at IS NULL
+  `;
+  const params = [];
+
+  if (userId) {
+    params.push(userId);
+    countSql += ` AND ur.user_id = $${params.length}`;
+    dataSql += ` AND ur.user_id = $${params.length}`;
+  }
+  if (roleId) {
+    params.push(roleId);
+    countSql += ` AND ur.role_id = $${params.length}`;
+    dataSql += ` AND ur.role_id = $${params.length}`;
+  }
+
+  const countRes = await query(countSql, params);
+  const total = parseInt(countRes.rows[0].count, 10);
+
+  dataSql += ` ORDER BY ur.assigned_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+  const { rows } = await query(dataSql, [...params, limit, offset]);
+
+  return {
+    assignments: rows,
+    pagination: { page: parseInt(page, 10), limit: parseInt(limit, 10), total, totalPages: Math.ceil(total / limit) },
+  };
+};
+
+const assignRolesToUser = async (userId, roleIds, actorId, isPrimary = false, expiresAt = null) => {
+  if (!Array.isArray(roleIds) || !roleIds.length) throw new BadRequestError('Role IDs array required');
+
+  const userRes = await query(`SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL`, [userId]);
+  if (!userRes.rows.length) throw new NotFoundError('User');
+
+  for (const roleId of roleIds) {
+    await query(
+      `INSERT INTO user_roles (user_id, role_id, is_primary, expires_at, assigned_by, assigned_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())
+       ON CONFLICT (user_id, role_id) DO UPDATE SET
+         is_primary = EXCLUDED.is_primary,
+         expires_at = EXCLUDED.expires_at,
+         assigned_at = NOW()`,
+      [userId, roleId, isPrimary, expiresAt, actorId]
+    );
+  }
+
+  invalidatePermissionCache();
+  await logAuditEvent({ actorId, action: 'user.assign_roles', entityType: 'user', entityId: userId, metadata: { roleIds } });
+  return { message: 'Roles assigned successfully.' };
+};
+
+const removeRoleFromUser = async (userId, roleId, actorId) => {
+  // Prevent removing superadmin role from the owner
+  const user = await query(`SELECT is_super_admin, email FROM users WHERE id = $1`, [userId]);
+  const role = await query(`SELECT slug FROM roles WHERE id = $1`, [roleId]);
+
+  if (user.rows.length && role.rows.length) {
+    if ((user.rows[0].is_super_admin || user.rows[0].email === 'superadmin@desigot.com') && role.rows[0].slug === 'superadmin') {
+      throw new ForbiddenError('Super Admin role cannot be removed from the application owner.');
+    }
+  }
+
+  await query(`DELETE FROM user_roles WHERE user_id = $1 AND role_id = $2`, [userId, roleId]);
+  invalidatePermissionCache();
+  await logAuditEvent({ actorId, action: 'user.remove_role', entityType: 'user', entityId: userId, metadata: { roleId } });
+  return { message: 'Role removed from user successfully.' };
+};
+
 module.exports = {
   getUserEffectivePermissions,
   getRoles,
@@ -1672,5 +1987,17 @@ module.exports = {
   revokeApiKey,
   getEmailTemplates,
   updateEmailTemplate,
+  getModuleAccess,
+  updateModuleAccess,
+  getApiPermissions,
+  createApiPermission,
+  updateApiPermission,
+  deleteApiPermission,
+  getAdminActivityLogs,
+  getSecuritySettings,
+  updateSecuritySettings,
+  getUserRoleAssignments,
+  assignRolesToUser,
+  removeRoleFromUser,
   logAuditEvent,
 };

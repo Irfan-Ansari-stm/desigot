@@ -12,6 +12,15 @@ router.get('/', authenticate, async (req, res) => {
   res.json({ success: true, data: r.data, pagination: { total: r.total, unread_count: r.unread_count, page: r.page, limit: r.limit } });
 });
 
+router.get('/unread-count', authenticate, async (req, res) => {
+  const { queryRead } = require('../../db/pool');
+  const result = await queryRead(
+    'SELECT COUNT(*)::int AS count FROM notifications WHERE user_id = $1 AND is_read = false',
+    [req.user.id]
+  );
+  successResponse(res, { unread_count: result.rows[0]?.count || 0 });
+});
+
 router.patch('/:id/read', authenticate, uuidParam(), validate,
   async (req, res) => successResponse(res, await svc.markAsRead(req.user.id, req.params.id))
 );

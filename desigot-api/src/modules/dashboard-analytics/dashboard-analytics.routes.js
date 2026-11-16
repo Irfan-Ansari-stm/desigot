@@ -1,6 +1,7 @@
 'use strict';
 const router = require('express').Router();
 const svc = require('./dashboard-analytics.service');
+const biSvc = require('./analytics-bi.service');
 const { authenticate } = require('../../middleware/auth');
 const { requirePermission } = require('../../middleware/authorize');
 const { successResponse } = require('../../shared/utils');
@@ -20,27 +21,35 @@ function sendDashboardResponse(res, data, meta = {}) {
 }
 
 // =============================================================================
-// OVERVIEW
+// OVERVIEW (Unified 12 KPIs + 10 Charts)
 // =============================================================================
 router.get(
   '/overview',
   authenticate,
   requirePermission('dashboard.overview.read'),
   async (req, res) => {
-    const data = await svc.getOverview(req.query);
-    return sendDashboardResponse(res, data);
+    const [legacyData, biData] = await Promise.all([
+      svc.getOverview(req.query).catch(() => ({})),
+      biSvc.getUnifiedOverview(req.query)
+    ]);
+    return sendDashboardResponse(res, {
+      ...legacyData,
+      ...biData,
+      kpis: biData.kpis,
+      charts: biData.charts
+    });
   }
 );
 
 // =============================================================================
-// REVENUE ANALYTICS
+// REVENUE ANALYTICS & REPORTS
 // =============================================================================
 router.get(
   '/revenue',
   authenticate,
   requirePermission('dashboard.revenue.read'),
   async (req, res) => {
-    const data = await svc.getRevenueAnalytics(req.query);
+    const data = await biSvc.getRevenueReport(req.query);
     return sendDashboardResponse(res, data);
   }
 );
@@ -109,14 +118,14 @@ router.get(
 );
 
 // =============================================================================
-// SALES ANALYTICS
+// SALES ANALYTICS & REPORTS
 // =============================================================================
 router.get(
   '/sales',
   authenticate,
   requirePermission('dashboard.sales.read'),
   async (req, res) => {
-    const data = await svc.getSalesAnalytics(req.query);
+    const data = await biSvc.getSalesReport(req.query);
     return sendDashboardResponse(res, data);
   }
 );
@@ -152,14 +161,14 @@ router.get(
 );
 
 // =============================================================================
-// SERVICE ANALYTICS
+// SERVICE ANALYTICS & REPORTS
 // =============================================================================
 router.get(
   '/services',
   authenticate,
   requirePermission('dashboard.services.read'),
   async (req, res) => {
-    const data = await svc.getServiceAnalytics(req.query);
+    const data = await biSvc.getServiceReport(req.query);
     return sendDashboardResponse(res, data);
   }
 );
@@ -185,14 +194,27 @@ router.get(
 );
 
 // =============================================================================
-// SELLER ANALYTICS
+// PRODUCT ANALYTICS & REPORTS
+// =============================================================================
+router.get(
+  '/products',
+  authenticate,
+  requirePermission('dashboard.services.read'),
+  async (req, res) => {
+    const data = await biSvc.getProductReport(req.query);
+    return sendDashboardResponse(res, data);
+  }
+);
+
+// =============================================================================
+// SELLER ANALYTICS & REPORTS
 // =============================================================================
 router.get(
   '/sellers',
   authenticate,
   requirePermission('dashboard.sellers.read'),
   async (req, res) => {
-    const data = await svc.getSellerAnalytics(req.query);
+    const data = await biSvc.getSellerReport(req.query);
     return sendDashboardResponse(res, data);
   }
 );
@@ -218,14 +240,14 @@ router.get(
 );
 
 // =============================================================================
-// CUSTOMER ANALYTICS
+// CUSTOMER ANALYTICS & REPORTS
 // =============================================================================
 router.get(
   '/customers',
   authenticate,
   requirePermission('dashboard.customers.read'),
   async (req, res) => {
-    const data = await svc.getCustomerAnalytics(req.query);
+    const data = await biSvc.getCustomerReport(req.query);
     return sendDashboardResponse(res, data);
   }
 );
@@ -324,6 +346,121 @@ router.get(
       return res.send(result.csv);
     }
     return res.json(result.data);
+  }
+);
+
+// =============================================================================
+// COMMISSION ANALYTICS & REPORTS
+// =============================================================================
+router.get(
+  '/commissions',
+  authenticate,
+  requirePermission('dashboard.revenue.read'),
+  async (req, res) => {
+    const data = await biSvc.getCommissionReport(req.query);
+    return sendDashboardResponse(res, data);
+  }
+);
+
+// =============================================================================
+// CONVERSION ANALYTICS & 7-STAGE FUNNEL
+// =============================================================================
+router.get(
+  '/conversion',
+  authenticate,
+  requirePermission('dashboard.sales.read'),
+  async (req, res) => {
+    const data = await biSvc.getConversionReport(req.query);
+    return sendDashboardResponse(res, data);
+  }
+);
+
+// =============================================================================
+// POPULAR CATEGORIES REPORT
+// =============================================================================
+router.get(
+  '/categories',
+  authenticate,
+  requirePermission('dashboard.marketplace.read'),
+  async (req, res) => {
+    const data = await biSvc.getCategoriesReport(req.query);
+    return sendDashboardResponse(res, data);
+  }
+);
+
+// =============================================================================
+// POPULAR SERVICES REPORT
+// =============================================================================
+router.get(
+  '/popular-services',
+  authenticate,
+  requirePermission('dashboard.services.read'),
+  async (req, res) => {
+    const data = await biSvc.getPopularServicesReport(req.query);
+    return sendDashboardResponse(res, data);
+  }
+);
+
+// =============================================================================
+// POPULAR PRODUCTS REPORT
+// =============================================================================
+router.get(
+  '/popular-products',
+  authenticate,
+  requirePermission('dashboard.services.read'),
+  async (req, res) => {
+    const data = await biSvc.getPopularProductsReport(req.query);
+    return sendDashboardResponse(res, data);
+  }
+);
+
+// =============================================================================
+// EXPORTS REPORT JOBS & DOWNLOADS
+// =============================================================================
+router.get(
+  '/exports',
+  authenticate,
+  requirePermission('dashboard.export'),
+  async (req, res) => {
+    const data = await biSvc.getExportReports(req.query);
+    return sendDashboardResponse(res, data);
+  }
+);
+
+router.post(
+  '/exports',
+  authenticate,
+  requirePermission('dashboard.export'),
+  async (req, res) => {
+    const data = await biSvc.createExportReport(req.body, req.user);
+    return res.status(201).json({ success: true, data });
+  }
+);
+
+router.get(
+  '/exports/:id/download',
+  authenticate,
+  requirePermission('dashboard.export'),
+  async (req, res) => {
+    const result = await biSvc.downloadExportReport(req.params.id);
+    if (!result) {
+      return res.status(404).json({ success: false, code: 'NOT_FOUND', message: 'Export report not found' });
+    }
+    res.setHeader('Content-Type', result.contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+    return res.send(result.content);
+  }
+);
+
+// =============================================================================
+// EVENT TRACKING INGESTION
+// =============================================================================
+router.post(
+  '/events',
+  async (req, res) => {
+    const userId = req.user ? req.user.id : null;
+    const event = await biSvc.trackAnalyticsEvent(req.body, userId);
+    return res.status(201).json({ success: true, data: event });
   }
 );
 

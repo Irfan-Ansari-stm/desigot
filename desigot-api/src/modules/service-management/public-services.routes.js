@@ -10,8 +10,13 @@ router.get('/', optionalAuthenticate, async (req, res) => {
     ...req.query,
     status: 'published', // Always enforce published only for public catalog
   };
-  const data = await serviceManager.listServices(query, req.user);
-  res.json({ success: true, data });
+  const result = await serviceManager.listServices(query, req.user);
+  res.json({
+    success: true,
+    data: result.services || result.data || [],
+    services: result.services || [],
+    pagination: result.pagination || { total: (result.services || []).length, page: 1, limit: 12 }
+  });
 });
 
 // Public Service Categories

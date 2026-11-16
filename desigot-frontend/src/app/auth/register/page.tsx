@@ -40,7 +40,8 @@ function RegisterPageInner() {
     try {
       await registerUser(data.email, data.password, data.display_name, role);
       toast.success("Account created! Welcome to Desigot 🎉");
-      router.push("/dashboard");
+      const redirectUrl = params.get("redirect") || (role === "seller" ? "/seller/onboarding" : "/dashboard");
+      router.push(redirectUrl);
     } catch (err) {
       toast.error(getErrorMessage(err));
     }

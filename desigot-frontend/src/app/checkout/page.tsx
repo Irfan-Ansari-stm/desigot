@@ -35,10 +35,24 @@ function CheckoutPageInner() {
   const handleSimulatePay = async () => {
     try {
       await simulatePay.mutateAsync(orderId);
-      setStep("done");
       toast.success("Payment successful! 🎉");
+      router.push(`/checkout/success?order_id=${orderId}`);
     } catch (err) { toast.error(getErrorMessage(err)); }
   };
+
+  if (!orderId) return (
+    <div className="min-h-screen bg-surface-50 flex flex-col">
+      <Navbar />
+      <div className="max-w-md mx-auto px-6 py-20 text-center">
+        <h1 className="text-2xl font-bold text-ink-primary mb-2">No Order Specified</h1>
+        <p className="text-ink-secondary text-sm mb-6">Please select an item from the marketplace or view your cart to proceed with checkout.</p>
+        <div className="flex gap-3 justify-center">
+          <Button variant="primary" onClick={() => router.push("/cart")}>View Cart</Button>
+          <Button variant="outline" onClick={() => router.push("/products")}>Browse Products</Button>
+        </div>
+      </div>
+    </div>
+  );
 
   if (isLoading) return (
     <div className="min-h-screen bg-surface-50"><Navbar />

@@ -41,6 +41,19 @@ const customerManagementRoutes = require('./modules/customer-management/customer
 const ordersBookingsRoutes     = require('./modules/orders-bookings/orders-bookings.routes');
 const categoriesTaxonomyRoutes = require('./modules/categories/categories-taxonomy.routes');
 const paymentsFinanceRoutes    = require('./modules/payments/payments-finance.routes');
+const communicationRoutes      = require('./modules/communication/communication.routes');
+const reviewsModerationRoutes  = require('./modules/reviews/reviews-moderation.routes');
+const marketingPromotionsRoutes = require('./modules/marketing/marketing-promotions.routes');
+const marketplaceMarketingRoutes = require('./modules/marketing/marketplace-marketing.routes');
+const cmsRoutes                  = require('./modules/cms/cms.routes');
+const publicCmsRoutes            = require('./modules/cms/public-cms.routes');
+const publicMarketplaceRoutes    = require('./modules/public/public.routes');
+const sellerRoutes               = require('./modules/seller/seller.routes');
+const securityRoutes             = require('./modules/security/security.routes');
+const integrationRoutes          = require('./modules/integrations/integrations.routes');
+const settingsRoutes             = require('./modules/settings/settings.routes');
+const accountRoutes              = require('./modules/account/account.routes');
+const path                     = require('path');
 
 const createApp = () => {
   const app = express();
@@ -129,17 +142,38 @@ const createApp = () => {
   app.use(`${v1}/admin/categories`,         categoriesTaxonomyRoutes);
   app.use(`${v1}/admin/finance`,             paymentsFinanceRoutes);
   app.use(`${v1}/admin/payments-finance`,     paymentsFinanceRoutes);
+  app.use(`${v1}/admin/communication`,       communicationRoutes);
+  app.use(`${v1}/communication`,             communicationRoutes);
+  app.use(`${v1}/admin/reviews`,             reviewsModerationRoutes);
+  app.use(`${v1}/admin/reviews-moderation`,  reviewsModerationRoutes);
+  app.use(`${v1}/admin/marketing`,           marketingPromotionsRoutes);
+  app.use(`${v1}/admin/marketing-promotions`,marketingPromotionsRoutes);
+  app.use(`${v1}/marketplace/marketing`,     marketplaceMarketingRoutes);
+  app.use(`${v1}/admin/cms`,                 cmsRoutes);
+  app.use(`${v1}/public/cms`,                publicCmsRoutes);
+  app.use(`${v1}/public`,                    publicMarketplaceRoutes);
+  app.use(`${v1}/seller`,                    sellerRoutes);
+  app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
   app.use(`${v1}/admin/dashboard`, dashboardAnalyticsRoutes);
   app.use(`${v1}/admin/analytics`, dashboardAnalyticsRoutes);
   app.use(`${v1}/admin`,         dashboardAnalyticsRoutes);
   app.use(`${v1}/admin`,         adminRoutes);
   app.use(`${v1}/analytics`,     dashboardAnalyticsRoutes);
   app.use(`${v1}/analytics`,     analyticsRoutes);
+  app.use(`${v1}/admin/security`,            securityRoutes);
+  app.use(`${v1}/security`,                  securityRoutes);
+  app.use(`${v1}/admin/integrations`,        integrationRoutes);
+  app.use(`${v1}/integrations`,              integrationRoutes);
+  app.use(`${v1}/admin/api-management`,      integrationRoutes);
   app.use(`${v1}/rbac`,          rbacRoutes);
   app.use(`${v1}/roles`,         rolesRoutes);
   app.use(`${v1}/permissions`,   permissionsRoutes);
   app.use(`${v1}/access-control`,accessControlRoutes);
   app.use(`${v1}/audit-logs`,    auditRoutes);
+  app.use(`${v1}/admin/settings`, settingsRoutes);
+  app.use(`${v1}/settings`,       settingsRoutes);
+  app.use(`${v1}/account`,        accountRoutes);
+  app.use(`${v1}/profile`,        accountRoutes);
   app.use(`${v1}/system`,        systemRoutes);
 
   // ── API root ──────────────────────────────────────────────────────────────────

@@ -34,6 +34,25 @@ router.get('/access-control/policies',       requireAnyPermission('access_contro
 router.post('/access-control/policies',      requirePermission('access_control.configure'), ctrl.createAccessPolicy);
 router.delete('/access-control/policies/:id',requirePermission('access_control.configure'), ctrl.deleteAccessPolicy);
 
+// ── MODULE ACCESS ────────────────────────────────────────────────────────────
+router.get('/modules/access',                requireAnyPermission('permissions.read', 'access_control.read'), ctrl.getModuleAccess);
+router.put('/modules/access',                requirePermission('permissions.manage'), ctrl.updateModuleAccess);
+router.post('/modules/access',               requirePermission('permissions.manage'), ctrl.updateModuleAccess);
+
+// ── API PERMISSIONS REGISTRY ──────────────────────────────────────────────────
+router.get('/api-permissions',               requireAnyPermission('api.read', 'access_control.read'), ctrl.getApiPermissions);
+router.post('/api-permissions',              requirePermission('api.create'), ctrl.createApiPermission);
+router.put('/api-permissions/:id',           requirePermission('api.update'), ctrl.updateApiPermission);
+router.delete('/api-permissions/:id',        requirePermission('api.delete'), ctrl.deleteApiPermission);
+
+// ── ROLE ASSIGNMENTS ─────────────────────────────────────────────────────────
+router.get('/assignments',                   requireAnyPermission('roles.read', 'users.read'), ctrl.getUserRoleAssignments);
+router.post('/assignments',                  requirePermission('users.assign_role'), ctrl.assignRolesToUser);
+router.delete('/assignments/:userId/:roleId',requirePermission('users.assign_role'), ctrl.removeRoleFromUser);
+
+// ── ADMIN ACTIVITY LOGS ──────────────────────────────────────────────────────
+router.get('/activity',                      requireAnyPermission('audit.read', 'audit.view'), ctrl.getAdminActivityLogs);
+
 // ── USER MANAGEMENT (RBAC) ────────────────────────────────────────────────────
 router.get('/users',                         requireAnyPermission('users.read', 'users.view'), ctrl.getUsers);
 router.post('/users',                        requirePermission('users.create'),                ctrl.createUser);
@@ -59,6 +78,8 @@ router.post('/designations',                 requirePermission('organization.cre
 router.get('/security/login-history',        requireAnyPermission('security.read', 'audit.read'), ctrl.getLoginHistory);
 router.get('/security/sessions',             requireAnyPermission('security.read', 'security.manage'), ctrl.getActiveSessions);
 router.delete('/security/sessions/:id',      requirePermission('security.manage'), ctrl.revokeSession);
+router.get('/security/settings',             requireAnyPermission('security.read', 'settings.read'), ctrl.getSecuritySettings);
+router.put('/security/settings',             requirePermission('security.configure'), ctrl.updateSecuritySettings);
 router.get('/security/events',               requireAnyPermission('security.read'), ctrl.getSecurityEvents);
 router.get('/security/ip-restrictions',      requireAnyPermission('security.read'), ctrl.getIpRestrictions);
 router.post('/security/ip-restrictions',     requirePermission('security.configure'), ctrl.createIpRestriction);

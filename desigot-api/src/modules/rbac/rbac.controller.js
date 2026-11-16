@@ -286,6 +286,73 @@ const updateEmailTemplate = async (req, res) => {
   return successResponse(res, template);
 };
 
+// ── Module Access Controllers ─────────────────────────────────────────────────
+const getModuleAccess = async (req, res) => {
+  const data = await rbacService.getModuleAccess();
+  return successResponse(res, data);
+};
+
+const updateModuleAccess = async (req, res) => {
+  const result = await rbacService.updateModuleAccess(req.body.updates || req.body, req.user.id);
+  return successResponse(res, result);
+};
+
+// ── API Permissions Controllers ───────────────────────────────────────────────
+const getApiPermissions = async (req, res) => {
+  const data = await rbacService.getApiPermissions(req.query);
+  return successResponse(res, data);
+};
+
+const createApiPermission = async (req, res) => {
+  const data = await rbacService.createApiPermission(req.body, req.user.id);
+  return successResponse(res, data, 201);
+};
+
+const updateApiPermission = async (req, res) => {
+  const data = await rbacService.updateApiPermission(req.params.id, req.body, req.user.id);
+  return successResponse(res, data);
+};
+
+const deleteApiPermission = async (req, res) => {
+  const result = await rbacService.deleteApiPermission(req.params.id, req.user.id);
+  return successResponse(res, result);
+};
+
+// ── Admin Activity Controllers ────────────────────────────────────────────────
+const getAdminActivityLogs = async (req, res) => {
+  const data = await rbacService.getAdminActivityLogs(req.query);
+  return successResponse(res, data.activity, 200, data.pagination);
+};
+
+// ── Security Settings Controllers ─────────────────────────────────────────────
+const getSecuritySettings = async (req, res) => {
+  const data = await rbacService.getSecuritySettings();
+  return successResponse(res, data);
+};
+
+const updateSecuritySettings = async (req, res) => {
+  const result = await rbacService.updateSecuritySettings(req.body, req.user.id);
+  return successResponse(res, result);
+};
+
+// ── Role Assignments Controllers ──────────────────────────────────────────────
+const getUserRoleAssignments = async (req, res) => {
+  const data = await rbacService.getUserRoleAssignments(req.query);
+  return successResponse(res, data.assignments, 200, data.pagination);
+};
+
+const assignRolesToUser = async (req, res) => {
+  const { userId, roleIds, isPrimary, expiresAt } = req.body;
+  const result = await rbacService.assignRolesToUser(userId, roleIds, req.user.id, isPrimary, expiresAt);
+  return successResponse(res, result);
+};
+
+const removeRoleFromUser = async (req, res) => {
+  const { userId, roleId } = req.params;
+  const result = await rbacService.removeRoleFromUser(userId, roleId, req.user.id);
+  return successResponse(res, result);
+};
+
 module.exports = {
   getRoles,
   getRoleById,
@@ -341,4 +408,16 @@ module.exports = {
   revokeApiKey,
   getEmailTemplates,
   updateEmailTemplate,
+  getModuleAccess,
+  updateModuleAccess,
+  getApiPermissions,
+  createApiPermission,
+  updateApiPermission,
+  deleteApiPermission,
+  getAdminActivityLogs,
+  getSecuritySettings,
+  updateSecuritySettings,
+  getUserRoleAssignments,
+  assignRolesToUser,
+  removeRoleFromUser,
 };

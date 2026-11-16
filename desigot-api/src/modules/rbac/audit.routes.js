@@ -6,7 +6,8 @@ const { requireAnyPermission } = require('../../middleware/authorize');
 
 router.use(authenticate);
 
-router.get('/',    requireAnyPermission('audit.read', 'audit.view'), ctrl.getAuditLogs);
-router.get('/:id', requireAnyPermission('audit.read', 'audit.view'), ctrl.getAuditLogById);
+router.get('/',         requireAnyPermission('audit.read', 'audit.view'), ctrl.getAuditLogs);
+router.get('/activity', requireAnyPermission('audit.read', 'audit.view'), ctrl.getAdminActivityLogs);
+router.get('/:id',      requireAnyPermission('audit.read', 'audit.view'), ctrl.getAuditLogById);
 
 module.exports = router;

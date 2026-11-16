@@ -249,3 +249,57 @@ export interface SuperAdminDashboardData {
     auditLogRetention: string;
   };
 }
+
+export interface RoleModuleAccess {
+  role_id: string;
+  module_id: string;
+  access_level: 'none' | 'read' | 'write' | 'admin';
+  is_accessible: boolean;
+}
+
+export interface ApiRoutePermission {
+  id: string;
+  module: string;
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  endpoint: string;
+  required_permission?: string;
+  description?: string;
+  is_protected: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminActivityLog {
+  id: string;
+  user_id?: string;
+  display_name?: string;
+  email?: string;
+  avatar_url?: string;
+  role?: string;
+  action: string;
+  module: string;
+  resource_type?: string;
+  resource_id?: string;
+  details?: string;
+  metadata?: Record<string, unknown>;
+  ip_address?: string;
+  user_agent?: string;
+  created_at: string;
+}
+
+export interface UserRoleAssignment {
+  assignment_id: string;
+  user_id: string;
+  role_id: string;
+  is_primary: boolean;
+  expires_at?: string;
+  assigned_at: string;
+  display_name: string;
+  email: string;
+  avatar_url?: string;
+  account_status: string;
+  role_name: string;
+  role_slug: string;
+  hierarchy_level: number;
+}
+

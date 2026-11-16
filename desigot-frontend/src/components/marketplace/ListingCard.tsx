@@ -22,10 +22,10 @@ export function ListingCard({ listing, variant = "standard", wishlistId }: Listi
   const [saved, setSaved] = useState(false);
   const [imgError, setImgError] = useState(false);
 
-  const lowestPrice = Math.min(
-    ...[listing.price_personal, listing.price_commercial, listing.price_extended]
-      .filter(Boolean) as number[]
-  );
+  const rawPrices = [listing.price_personal, listing.price_commercial, listing.price_extended]
+    .map((p) => (p !== null && p !== undefined ? Number(p) : NaN))
+    .filter((p) => !isNaN(p) && p > 0);
+  const lowestPrice = rawPrices.length > 0 ? Math.min(...rawPrices) : null;
 
   const handleSave = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -127,7 +127,7 @@ export function ListingCard({ listing, variant = "standard", wishlistId }: Listi
 
           <div className="flex items-center justify-between mt-2.5">
             <div>
-              {lowestPrice ? (
+              {lowestPrice !== null ? (
                 <span className="text-base font-bold text-ink-primary">
                   From {formatPrice(lowestPrice)}
                 </span>
@@ -135,7 +135,7 @@ export function ListingCard({ listing, variant = "standard", wishlistId }: Listi
                 <span className="text-sm text-ink-secondary">Custom price</span>
               )}
             </div>
-            {listing.avg_rating && listing.review_count > 0 ? (
+            {Number(listing.avg_rating) > 0 && Number(listing.review_count) > 0 ? (
               <StarRating rating={listing.avg_rating} showValue count={listing.review_count} />
             ) : null}
           </div>
