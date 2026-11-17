@@ -47,6 +47,7 @@ const marketingPromotionsRoutes = require('./modules/marketing/marketing-promoti
 const marketplaceMarketingRoutes = require('./modules/marketing/marketplace-marketing.routes');
 const cmsRoutes                  = require('./modules/cms/cms.routes');
 const publicCmsRoutes            = require('./modules/cms/public-cms.routes');
+const footerAdminRoutes          = require('./modules/cms/footer.routes');
 const publicMarketplaceRoutes    = require('./modules/public/public.routes');
 const sellerRoutes               = require('./modules/seller/seller.routes');
 const securityRoutes             = require('./modules/security/security.routes');
@@ -150,6 +151,7 @@ const createApp = () => {
   app.use(`${v1}/admin/marketing-promotions`,marketingPromotionsRoutes);
   app.use(`${v1}/marketplace/marketing`,     marketplaceMarketingRoutes);
   app.use(`${v1}/admin/cms`,                 cmsRoutes);
+  app.use(`${v1}/admin/footer`,              footerAdminRoutes);
   app.use(`${v1}/public/cms`,                publicCmsRoutes);
   app.use(`${v1}/public`,                    publicMarketplaceRoutes);
   app.use(`${v1}/seller`,                    sellerRoutes);

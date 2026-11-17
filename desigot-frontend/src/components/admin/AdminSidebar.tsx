@@ -392,11 +392,11 @@ export const navigationConfig: NavSection[] = [
     icon: User,
     items: [
       { title: "My Profile", href: "/dashboard/profile" },
-      { title: "Change Password", href: "/dashboard/profile?tab=password" },
-      { title: "Two-Factor Auth", href: "/dashboard/profile?tab=mfa" },
-      { title: "Active Sessions", href: "/dashboard/profile?tab=sessions" },
-      { title: "Account Security", href: "/dashboard/profile?tab=security" },
-      { title: "Preferences", href: "/dashboard/profile?tab=preferences" },
+      { title: "Change Password", href: "/dashboard/profile/change-password" },
+      { title: "Two-Factor Auth", href: "/dashboard/profile/two-factor-auth" },
+      { title: "Active Sessions", href: "/dashboard/profile/active-sessions" },
+      { title: "Account Security", href: "/dashboard/profile/security" },
+      { title: "Preferences", href: "/dashboard/profile/preferences" },
     ],
   },
   {

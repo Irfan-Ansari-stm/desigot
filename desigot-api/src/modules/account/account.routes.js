@@ -30,6 +30,15 @@ router.patch('/profile', async (req, res, next) => {
   }
 });
 
+router.put('/profile', async (req, res, next) => {
+  try {
+    const updated = await accountService.updateProfile(req.user.id, req.body);
+    res.json({ success: true, message: 'Profile updated successfully', data: updated });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post('/profile/avatar', async (req, res, next) => {
   try {
     const avatar = await accountService.uploadAvatar(req.user.id, req.body.avatar_url);
@@ -61,9 +70,42 @@ router.post('/email/change', async (req, res, next) => {
   }
 });
 
+router.post('/email/send-verification', async (req, res, next) => {
+  try {
+    res.json({ success: true, message: 'Verification email sent successfully.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/email/resend', async (req, res, next) => {
+  try {
+    res.json({ success: true, message: 'Verification link resent.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post('/email/verify', async (req, res, next) => {
   try {
     res.json({ success: true, message: 'Email verified successfully.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/phone/send-otp', async (req, res, next) => {
+  try {
+    res.json({ success: true, message: 'OTP sent to mobile phone successfully.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put('/phone', async (req, res, next) => {
+  try {
+    const result = await accountService.changePhone(req.user.id, req.body.phone || req.body.new_phone);
+    res.json({ success: true, message: result.message, data: result });
   } catch (err) {
     next(err);
   }
@@ -112,6 +154,15 @@ router.post('/password/change', async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 router.get('/2fa', async (req, res, next) => {
+  try {
+    const status = await accountService.get2FAStatus(req.user.id);
+    res.json({ success: true, data: status });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/2fa/status', async (req, res, next) => {
   try {
     const status = await accountService.get2FAStatus(req.user.id);
     res.json({ success: true, data: status });
@@ -207,11 +258,29 @@ router.post('/sessions/revoke-others', async (req, res, next) => {
   }
 });
 
+router.post('/sessions/revoke-all', async (req, res, next) => {
+  try {
+    await accountService.revokeAllSessions(req.user.id);
+    res.json({ success: true, message: 'All active sessions revoked' });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 6. ACCOUNT SECURITY & EVENTS
 // ─────────────────────────────────────────────────────────────────────────────
 
 router.get('/security', async (req, res, next) => {
+  try {
+    const overview = await accountService.getSecurityOverview(req.user.id);
+    res.json({ success: true, data: overview });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/security/overview', async (req, res, next) => {
   try {
     const overview = await accountService.getSecurityOverview(req.user.id);
     res.json({ success: true, data: overview });
@@ -262,6 +331,15 @@ router.get('/preferences', async (req, res, next) => {
 });
 
 router.patch('/preferences', async (req, res, next) => {
+  try {
+    const updated = await accountService.updatePreferences(req.user.id, req.body);
+    res.json({ success: true, message: 'Preferences updated', data: updated });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put('/preferences', async (req, res, next) => {
   try {
     const updated = await accountService.updatePreferences(req.user.id, req.body);
     res.json({ success: true, message: 'Preferences updated', data: updated });

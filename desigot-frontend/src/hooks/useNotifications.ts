@@ -3,16 +3,21 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPatch, apiPost, apiDelete, apiPut } from "@/lib/api";
 import type { Notification } from "@/types";
 import { useUIStore } from "@/store/ui.store";
+import { useAuthStore } from "@/store/auth.store";
 import { useEffect } from "react";
 
-export const useNotifications = (unreadOnly = false) =>
-  useQuery({
+export const useNotifications = (unreadOnly = false, enabled = true) => {
+  const token = useAuthStore((s) => s.accessToken);
+  const isAuth = !!token;
+  return useQuery({
     queryKey: ["notifications", unreadOnly],
     queryFn: () => apiGet<{ data: Notification[]; pagination: unknown; unread_count: number }>(
       `/notifications${unreadOnly ? "?unread_only=true" : "?limit=30"}`
     ),
-    refetchInterval: 30_000,
+    enabled: enabled && isAuth,
+    refetchInterval: enabled && isAuth ? 30_000 : false,
   });
+};
 
 export const useMarkAsRead = () => {
   const qc = useQueryClient();

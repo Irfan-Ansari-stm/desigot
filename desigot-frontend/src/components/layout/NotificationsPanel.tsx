@@ -1,6 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useUIStore } from "@/store/ui.store";
+import { useAuthStore } from "@/store/auth.store";
 import { useNotifications, useMarkAllAsRead, useMarkAsRead, useDeleteNotification } from "@/hooks/useNotifications";
 import { useUnreadCount } from "@/hooks/useMarketplace";
 import {
@@ -34,8 +35,9 @@ const typeIcon: Record<string, React.ReactNode> = {
 export function NotificationsPanel() {
   const router = useRouter();
   const { notificationsPanelOpen, toggleNotificationsPanel } = useUIStore();
-  const { data } = useNotifications();
-  const { data: unreadData, refetch: refetchUnread } = useUnreadCount();
+  const isAuth = useAuthStore((s) => !!s.accessToken);
+  const { data } = useNotifications(false, isAuth);
+  const { data: unreadData, refetch: refetchUnread } = useUnreadCount(isAuth);
   const markAllAsRead = useMarkAllAsRead();
   const markAsRead = useMarkAsRead();
   const deleteNotif = useDeleteNotification();
@@ -98,7 +100,22 @@ export function NotificationsPanel() {
 
         {/* List */}
         <div className="max-h-[380px] overflow-y-auto divide-y divide-slate-100 scrollbar-thin">
-          {notifications.length === 0 ? (
+          {!isAuth ? (
+            <div className="py-10 px-4 text-center">
+              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3">
+                <Bell className="h-5 w-5 text-slate-400" />
+              </div>
+              <p className="text-sm font-semibold text-slate-800">Sign in to view notifications</p>
+              <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">Stay updated on your orders, messages, deliverables, and projects.</p>
+              <Link
+                href="/login?redirect=/notifications"
+                onClick={toggleNotificationsPanel}
+                className="inline-block mt-4 px-5 py-2 text-xs font-bold text-white bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 rounded-full shadow-sm transition-all"
+              >
+                Sign In
+              </Link>
+            </div>
+          ) : notifications.length === 0 ? (
             <div className="py-12 text-center">
               <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3">
                 <Bell className="h-5 w-5 text-slate-400" />
@@ -151,7 +168,7 @@ export function NotificationsPanel() {
         {/* Footer */}
         <div className="px-4 py-3 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
           <Link
-            href="/account/settings"
+            href="/dashboard/profile"
             onClick={toggleNotificationsPanel}
             className="text-xs text-slate-500 hover:text-slate-800 font-medium"
           >

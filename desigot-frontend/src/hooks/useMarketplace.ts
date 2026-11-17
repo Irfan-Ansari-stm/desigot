@@ -1,6 +1,7 @@
 "use client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { useAuthStore } from "@/store/auth.store";
 
 // Helper for API GET
 const fetcher = async <T>(url: string): Promise<T> => {
@@ -345,11 +346,14 @@ export const useSubmitSellerApplication = () => {
 };
 
 // 20. Unread Notifications Count
-export const useUnreadCount = () => {
+export const useUnreadCount = (enabled: boolean = true) => {
+  const token = useAuthStore((s) => s.accessToken);
+  const isAuth = !!token;
   return useQuery({
     queryKey: ["notifications-unread-count"],
     queryFn: () => fetcher<{ unread_count: number }>("/notifications/unread-count"),
+    enabled: enabled && isAuth,
     staleTime: 15_000,
-    refetchInterval: 30_000,
+    refetchInterval: enabled && isAuth ? 30_000 : false,
   });
 };

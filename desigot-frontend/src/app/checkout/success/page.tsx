@@ -119,9 +119,9 @@ function CheckoutSuccessContent() {
           )}
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4 border-t border-border">
-            <Link href="/account/orders">
+            <Link href="/dashboard/orders-bookings/all">
               <Button variant="secondary" className="w-full sm:w-auto">
-                Go to Account Orders
+                View Orders in Dashboard
               </Button>
             </Link>
             <Link href="/products">

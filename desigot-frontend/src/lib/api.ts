@@ -120,15 +120,15 @@ export const apiGet    = <T>(url: string, params?: object) => api.get<any>(url, 
   }
   return (r.data?.data !== undefined ? r.data.data : r.data) as T;
 });
-export const apiPost   = <T>(url: string, body?: unknown)  => api.post<{ success: boolean; data: T }>(url, body).then((r) => r.data.data);
-export const apiPatch  = <T>(url: string, body?: unknown)  => api.patch<{ success: boolean; data: T }>(url, body).then((r) => r.data.data);
-export const apiPut    = <T>(url: string, body?: unknown)  => api.put<{ success: boolean; data: T }>(url, body).then((r) => r.data.data);
-export const apiDelete = <T>(url: string)                  => api.delete<{ success: boolean; data: T }>(url).then((r) => r.data.data);
+export const apiPost   = <T>(url: string, body?: unknown)  => api.post<any>(url, body).then((r) => (r.data?.data !== undefined ? r.data.data : r.data) as T);
+export const apiPatch  = <T>(url: string, body?: unknown)  => api.patch<any>(url, body).then((r) => (r.data?.data !== undefined ? r.data.data : r.data) as T);
+export const apiPut    = <T>(url: string, body?: unknown)  => api.put<any>(url, body).then((r) => (r.data?.data !== undefined ? r.data.data : r.data) as T);
+export const apiDelete = <T>(url: string)                  => api.delete<any>(url).then((r) => (r.data?.data !== undefined ? r.data.data : r.data) as T);
 
 export const apiUpload = <T>(url: string, formData: FormData) =>
-  api.post<{ success: boolean; data: T }>(url, formData, {
+  api.post<any>(url, formData, {
     headers: { "Content-Type": "multipart/form-data" },
-  }).then((r) => r.data.data);
+  }).then((r) => (r.data?.data !== undefined ? r.data.data : r.data) as T);
 
 export const getErrorMessage = (error: unknown): string => {
   if (axios.isAxiosError(error)) {

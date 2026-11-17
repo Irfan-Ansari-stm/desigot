@@ -1339,4 +1339,133 @@ router.get('/search/popular', async (req, res, next) => {
   }
 });
 
+// ============================================================================
+// PUBLIC FOOTER & NEWSLETTER ENDPOINTS
+// ============================================================================
+router.get('/footer', async (req, res, next) => {
+  try {
+    const sRes = await queryRead(`SELECT * FROM cms_footer_settings WHERE is_active = true LIMIT 1`);
+    const cRes = await queryRead(`SELECT * FROM cms_footer_columns WHERE is_active = true ORDER BY column_order ASC`);
+    const lRes = await queryRead(`SELECT * FROM cms_footer_links WHERE is_active = true ORDER BY sort_order ASC`);
+    const socRes = await queryRead(`SELECT * FROM footer_social_links WHERE enabled = true ORDER BY display_order ASC`);
+    const legRes = await queryRead(`SELECT * FROM footer_legal_links WHERE enabled = true ORDER BY display_order ASC`);
+
+    const columns = cRes.rows.map(col => ({
+      ...col,
+      links: lRes.rows.filter(l => l.column_id === col.id)
+    }));
+
+    return successResponse(res, {
+      settings: sRes.rows[0] || null,
+      columns,
+      social_links: socRes.rows,
+      legal_links: legRes.rows
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/footer/columns', async (req, res, next) => {
+  try {
+    const cRes = await queryRead(`SELECT * FROM cms_footer_columns WHERE is_active = true ORDER BY column_order ASC`);
+    const lRes = await queryRead(`SELECT * FROM cms_footer_links WHERE is_active = true ORDER BY sort_order ASC`);
+    const columns = cRes.rows.map(col => ({
+      ...col,
+      links: lRes.rows.filter(l => l.column_id === col.id)
+    }));
+    return successResponse(res, columns);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/footer/social-links', async (req, res, next) => {
+  try {
+    const socRes = await queryRead(`SELECT * FROM footer_social_links WHERE enabled = true ORDER BY display_order ASC`);
+    return successResponse(res, socRes.rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/footer/legal-links', async (req, res, next) => {
+  try {
+    const legRes = await queryRead(`SELECT * FROM footer_legal_links WHERE enabled = true ORDER BY display_order ASC`);
+    return successResponse(res, legRes.rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/footer/settings', async (req, res, next) => {
+  try {
+    const sRes = await queryRead(`SELECT * FROM cms_footer_settings WHERE is_active = true LIMIT 1`);
+    return successResponse(res, sRes.rows[0] || null);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/newsletter/subscribe', async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ success: false, message: 'Please provide a valid email address.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const existing = await queryRead(`SELECT * FROM newsletter_subscribers WHERE email = $1`, [cleanEmail]);
+
+    if (existing.rows.length > 0) {
+      if (existing.rows[0].status === 'active' || existing.rows[0].status === 'subscribed') {
+        return successResponse(res, { alreadySubscribed: true }, 200, {
+          message: 'You are already subscribed to the Desigot creative newsletter!'
+        });
+      } else {
+        await queryRead(`
+          UPDATE newsletter_subscribers 
+          SET status = 'active', unsubscribed_at = NULL, subscribed_at = NOW() 
+          WHERE id = $1
+        `, [existing.rows[0].id]);
+        return successResponse(res, { reactivated: true }, 200, {
+          message: 'Welcome back! Your newsletter subscription has been reactivated.'
+        });
+      }
+    }
+
+    const ins = await queryRead(`
+      INSERT INTO newsletter_subscribers (email, status, source, subscribed_at)
+      VALUES ($1, 'active', 'footer_widget', NOW())
+      RETURNING id, email, status, subscribed_at
+    `, [cleanEmail]);
+
+    return successResponse(res, ins.rows[0], 201, {
+      message: 'Thank you for subscribing! Check your inbox for your welcome design asset kit.'
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/newsletter/unsubscribe', async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email is required' });
+    }
+    const cleanEmail = email.trim().toLowerCase();
+    await queryRead(`
+      UPDATE newsletter_subscribers 
+      SET status = 'unsubscribed', unsubscribed_at = NOW() 
+      WHERE email = $1
+    `, [cleanEmail]);
+    return successResponse(res, { success: true }, 200, {
+      message: 'You have been successfully unsubscribed from Desigot newsletters.'
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;

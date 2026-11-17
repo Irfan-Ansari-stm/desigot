@@ -493,6 +493,17 @@ class AccountService {
     return { success: true, message: 'All other active sessions have been terminated' };
   }
 
+  async revokeAllSessions(userId) {
+    await query(
+      `UPDATE admin_sessions
+       SET is_revoked = true
+       WHERE user_id = $1`,
+      [userId]
+    );
+
+    return { success: true, message: 'All active sessions have been terminated' };
+  }
+
   // ─────────────────────────────────────────────────────────────────────────────
   // 6. ACCOUNT SECURITY & EVENTS
   // ─────────────────────────────────────────────────────────────────────────────

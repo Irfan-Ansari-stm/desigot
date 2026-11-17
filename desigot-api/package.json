@@ -15,6 +15,8 @@
     "db:seed:rbac-enterprise": "node src/db/seed-rbac-enterprise.js",
     "db:migrate:dashboard": "node src/db/migrate-dashboard.js",
     "db:migrate:seller": "node src/db/migrate-seller-applications.js",
+    "db:migrate:footer": "node src/db/migrate-footer.js",
+    "db:seed:footer": "node src/db/seed-footer-complete.js",
     "db:seed:marketplace": "node src/db/seed-marketplace.js",
     "db:seed:public": "node src/db/seed-marketplace-public.js",
     "db:migrate:communication": "node src/db/migrate-communication.js",

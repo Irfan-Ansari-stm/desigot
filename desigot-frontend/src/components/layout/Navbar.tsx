@@ -25,7 +25,10 @@ import {
   ShieldCheck,
   Package,
   DollarSign,
-  CreditCard
+  CreditCard,
+  Crown,
+  UserCheck,
+  Globe
 } from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
 import { useUIStore } from "@/store/ui.store";
@@ -41,7 +44,9 @@ export function Navbar() {
   const { user, logout, isAuthenticated, isSeller, isAdmin } = useAuthStore();
   const { toggleNotificationsPanel, toggleMobileNav, mobileNavOpen } = useUIStore();
   const { data: navData } = useMarketplaceNav();
-  const { data: unreadData } = useUnreadCount();
+  const [mounted, setMounted] = useState(false);
+  const isAuth = mounted && isAuthenticated();
+  const { data: unreadData } = useUnreadCount(isAuth);
   const totalCartItems = useCartStore((s) => s.totalItems());
 
   const [scrolled, setScrolled] = useState(false);
@@ -49,7 +54,6 @@ export function Navbar() {
   const [searchQ, setSearchQ] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [catSearch, setCatSearch] = useState("");
-  const [mounted, setMounted] = useState(false);
 
   const searchRef = useRef<HTMLInputElement>(null);
   const megaRef = useRef<HTMLDivElement>(null);
@@ -58,7 +62,7 @@ export function Navbar() {
   const { data: suggestionsData } = useSearchSuggestions(searchQ);
   const { data: popularSearches } = usePopularSearches();
 
-  const unreadCount = unreadData?.unread_count ?? 0;
+  const unreadCount = isAuth ? (unreadData?.unread_count ?? 0) : 0;
 
   useEffect(() => {
     setMounted(true);
@@ -72,6 +76,45 @@ export function Navbar() {
     setMegaOpen(false);
     setSearchFocused(false);
   }, [pathname]);
+
+  // Click outside to close mega menu
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (megaRef.current && !megaRef.current.contains(event.target as Node)) {
+        setMegaOpen(false);
+      }
+    }
+    if (megaOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [megaOpen]);
+
+  // Close mega menu & search on Escape key
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setMegaOpen(false);
+        setSearchFocused(false);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Body scroll lock on mobile nav open
+  useEffect(() => {
+    if (mobileNavOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileNavOpen]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,18 +130,80 @@ export function Navbar() {
       router.push("/login?redirect=/seller/onboarding");
       return;
     }
-    if (isSeller()) {
-      router.push("/seller/dashboard");
+    if (isAdmin() || isSeller()) {
+      router.push("/dashboard");
     } else {
       router.push("/seller/onboarding");
     }
   };
 
-  const megaCategories = navData?.mega_menu_categories || [];
+  const fallbackMegaCategories = [
+    {
+      id: "cat-creative",
+      name: "Creative & Design",
+      slug: "creative-design",
+      subcategories: [
+        { id: "sub-1", name: "UI Kits & Design Systems", slug: "ui-kits" },
+        { id: "sub-2", name: "Figma & Sketch Components", slug: "figma-templates" },
+        { id: "sub-3", name: "Brand & Logo Guidelines", slug: "creative-design" },
+      ],
+      total_subcategories: 3,
+    },
+    {
+      id: "cat-ui-kits",
+      name: "UI Kits & Systems",
+      slug: "ui-kits",
+      subcategories: [
+        { id: "sub-4", name: "Mobile App Screens", slug: "mobile-apps" },
+        { id: "sub-5", name: "Dashboard SaaS Kits", slug: "dashboards" },
+        { id: "sub-6", name: "E-Commerce Design Sets", slug: "ui-kits" },
+      ],
+      total_subcategories: 3,
+    },
+    {
+      id: "cat-dev",
+      name: "Development & Tech",
+      slug: "development-technology",
+      subcategories: [
+        { id: "sub-7", name: "Next.js & React Boilerplates", slug: "development-technology" },
+        { id: "sub-8", name: "Tailwind UI Components", slug: "development-technology" },
+        { id: "sub-9", name: "Full-Stack Templates", slug: "development-technology" },
+      ],
+      total_subcategories: 3,
+    },
+    {
+      id: "cat-mobile",
+      name: "Mobile App Design",
+      slug: "mobile-apps",
+      subcategories: [
+        { id: "sub-10", name: "iOS App Templates", slug: "mobile-apps" },
+        { id: "sub-11", name: "Android Material Design", slug: "mobile-apps" },
+        { id: "sub-12", name: "Cross-Platform Flows", slug: "mobile-apps" },
+      ],
+      total_subcategories: 3,
+    },
+    {
+      id: "cat-dashboards",
+      name: "SaaS & Dashboards",
+      slug: "dashboards",
+      subcategories: [
+        { id: "sub-13", name: "Analytics & Metrics UI", slug: "dashboards" },
+        { id: "sub-14", name: "CRM & ERP Portals", slug: "dashboards" },
+        { id: "sub-15", name: "Financial & Crypto Dashboards", slug: "dashboards" },
+      ],
+      total_subcategories: 3,
+    },
+  ];
+
+  const megaCategories =
+    navData?.mega_menu_categories && navData.mega_menu_categories.length > 0
+      ? navData.mega_menu_categories
+      : fallbackMegaCategories;
+
   const filteredMegaCategories = catSearch.trim()
-    ? megaCategories.filter(c =>
+    ? megaCategories.filter((c) =>
         c.name.toLowerCase().includes(catSearch.toLowerCase()) ||
-        c.subcategories.some(s => s.name.toLowerCase().includes(catSearch.toLowerCase()))
+        c.subcategories?.some((s) => s.name.toLowerCase().includes(catSearch.toLowerCase()))
       )
     : megaCategories;
 
@@ -521,11 +626,11 @@ export function Navbar() {
                 </div>
               ) : (
                 <Link
-                  href="/account"
+                  href="/dashboard"
                   onClick={toggleMobileNav}
                   className="flex items-center justify-center py-2 text-xs font-bold text-slate-700 border border-slate-200 hover:bg-slate-50 rounded-xl"
                 >
-                  My Account
+                  Dashboard
                 </Link>
               )}
             </div>
@@ -624,7 +729,11 @@ function UserMenu({
           <div className="px-3.5 py-2 border-b border-slate-100">
             <div className="flex items-center justify-between">
               <p className="text-xs font-bold text-slate-900 truncate">{user.display_name || "Desigot Member"}</p>
-              {isAdminRole ? (
+              {user?.role === "superadmin" ? (
+                <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
+                  Super Admin
+                </span>
+              ) : isAdminRole ? (
                 <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">
                   Admin
                 </span>
@@ -641,146 +750,32 @@ function UserMenu({
             <p className="text-[11px] text-slate-500 truncate">{user.email}</p>
           </div>
 
-          {/* ADMIN SECTION */}
-          {isAdminRole && (
-            <div className="py-1 border-b border-slate-100">
-              <DropdownMenu.Item asChild>
-                <Link
-                  href="/dashboard"
-                  className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-bold text-purple-700 hover:bg-purple-50 cursor-pointer outline-none"
-                >
-                  <LayoutDashboard className="h-4 w-4 text-purple-600" /> Admin Dashboard
-                </Link>
-              </DropdownMenu.Item>
-              <DropdownMenu.Item asChild>
-                <Link
-                  href="/dashboard/marketplace"
-                  className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer outline-none"
-                >
-                  <Briefcase className="h-4 w-4 text-slate-400" /> Marketplace Management
-                </Link>
-              </DropdownMenu.Item>
-              <DropdownMenu.Item asChild>
-                <Link
-                  href="/dashboard/system"
-                  className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer outline-none"
-                >
-                  <Settings className="h-4 w-4 text-slate-400" /> System Administration
-                </Link>
-              </DropdownMenu.Item>
-            </div>
-          )}
-
-          {/* SELLER SECTION */}
-          {isSellerRole && (
-            <div className="py-1 border-b border-slate-100">
-              <DropdownMenu.Item asChild>
-                <Link
-                  href="/seller/dashboard"
-                  className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 cursor-pointer outline-none"
-                >
-                  <LayoutDashboard className="h-4 w-4 text-rose-500" /> Seller Dashboard
-                </Link>
-              </DropdownMenu.Item>
-              <DropdownMenu.Item asChild>
-                <Link
-                  href="/seller/services"
-                  className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer outline-none"
-                >
-                  <Briefcase className="h-4 w-4 text-slate-400" /> My Services
-                </Link>
-              </DropdownMenu.Item>
-              <DropdownMenu.Item asChild>
-                <Link
-                  href="/seller/products"
-                  className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer outline-none"
-                >
-                  <Package className="h-4 w-4 text-slate-400" /> My Products
-                </Link>
-              </DropdownMenu.Item>
-              <DropdownMenu.Item asChild>
-                <Link
-                  href="/seller/orders"
-                  className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer outline-none"
-                >
-                  <ShoppingBag className="h-4 w-4 text-slate-400" /> Seller Orders
-                </Link>
-              </DropdownMenu.Item>
-              <DropdownMenu.Item asChild>
-                <Link
-                  href="/seller/earnings"
-                  className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer outline-none"
-                >
-                  <DollarSign className="h-4 w-4 text-slate-400" /> Earnings & Payouts
-                </Link>
-              </DropdownMenu.Item>
-              <DropdownMenu.Item asChild>
-                <Link
-                  href="/seller/profile"
-                  className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer outline-none"
-                >
-                  <UserIcon className="h-4 w-4 text-slate-400" /> Public Seller Profile
-                </Link>
-              </DropdownMenu.Item>
-            </div>
-          )}
-
-          {/* CUSTOMER SECTION */}
+          {/* ── UNIFIED COMMAND DASHBOARD & ACCOUNT MENU ──────────────── */}
           <div className="py-1">
             <DropdownMenu.Item asChild>
               <Link
-                href="/account/profile"
-                className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer outline-none"
+                href="/dashboard"
+                className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-bold text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 cursor-pointer outline-none rounded-lg mx-1"
               >
-                <UserIcon className="h-4 w-4 text-slate-400" /> My Profile
+                <LayoutDashboard className="h-4 w-4 text-indigo-600" /> Unified Dashboard
               </Link>
             </DropdownMenu.Item>
+
             <DropdownMenu.Item asChild>
               <Link
-                href="/account/orders"
-                className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer outline-none"
+                href="/dashboard/profile"
+                className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer outline-none rounded-lg mx-1"
               >
-                <ShoppingBag className="h-4 w-4 text-slate-400" /> My Orders
+                <UserIcon className="h-4 w-4 text-slate-500" /> My Profile
               </Link>
             </DropdownMenu.Item>
+
             <DropdownMenu.Item asChild>
               <Link
-                href="/account/bookings"
-                className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer outline-none"
+                href="/dashboard/profile/security"
+                className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer outline-none rounded-lg mx-1"
               >
-                <Calendar className="h-4 w-4 text-slate-400" /> My Bookings
-              </Link>
-            </DropdownMenu.Item>
-            <DropdownMenu.Item asChild>
-              <Link
-                href="/account/messages"
-                className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer outline-none"
-              >
-                <MessageSquare className="h-4 w-4 text-slate-400" /> Messages
-              </Link>
-            </DropdownMenu.Item>
-            <DropdownMenu.Item asChild>
-              <Link
-                href="/account/favorites"
-                className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer outline-none"
-              >
-                <Heart className="h-4 w-4 text-slate-400" /> Favorites
-              </Link>
-            </DropdownMenu.Item>
-            <DropdownMenu.Item asChild>
-              <Link
-                href="/account/reviews"
-                className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer outline-none"
-              >
-                <Star className="h-4 w-4 text-slate-400" /> My Reviews
-              </Link>
-            </DropdownMenu.Item>
-            <DropdownMenu.Item asChild>
-              <Link
-                href="/account/settings"
-                className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer outline-none"
-              >
-                <Settings className="h-4 w-4 text-slate-400" /> Account Settings
+                <Settings className="h-4 w-4 text-slate-500" /> Security & Preferences
               </Link>
             </DropdownMenu.Item>
           </div>

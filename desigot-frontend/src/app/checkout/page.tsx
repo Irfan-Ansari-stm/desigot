@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Navbar } from "@/components/layout/Navbar";
+import { Footer } from "@/components/layout/Footer";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -50,6 +51,9 @@ function CheckoutPageInner() {
           <Button variant="primary" onClick={() => router.push("/cart")}>View Cart</Button>
           <Button variant="outline" onClick={() => router.push("/products")}>Browse Products</Button>
         </div>
+      </div>
+      <div className="mt-auto">
+        <Footer />
       </div>
     </div>
   );
@@ -168,6 +172,7 @@ function CheckoutPageInner() {
           </div>
         </div>
       </main>
+      <Footer />
     </div>
   );
 }

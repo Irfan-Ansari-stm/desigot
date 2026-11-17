@@ -154,7 +154,9 @@ export default function ServiceDetailPage() {
                     {seller.name}
                   </span>
                   {seller.is_verified && (
-                    <ShieldCheck className="w-4 h-4 text-blue-500" title="Verified Agency Specialist" />
+                    <span title="Verified Agency Specialist">
+                      <ShieldCheck className="w-4 h-4 text-blue-500" />
+                    </span>
                   )}
                 </Link>
 

@@ -173,7 +173,9 @@ export function AdminTopNav() {
 
           {/* Dropdown Menu */}
           {isUserMenuOpen && (
-            <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 py-1.5 z-50">
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setIsUserMenuOpen(false)} />
+              <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 py-1.5 z-50">
               <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800">
                 <div className="text-xs font-bold text-slate-900 dark:text-slate-100">
                   {user?.display_name}
@@ -216,6 +218,7 @@ export function AdminTopNav() {
                 <LogOut className="h-3.5 w-3.5" /> Sign Out
               </button>
             </div>
+            </>
           )}
         </div>
       </div>

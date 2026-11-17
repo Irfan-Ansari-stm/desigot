@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
-export default function ServicesMarketplacePage() {
+function ServicesMarketplacePageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -459,5 +459,19 @@ export default function ServicesMarketplacePage() {
 
       <Footer />
     </div>
+  );
+}
+
+export default function ServicesMarketplacePage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+          <div className="w-10 h-10 border-4 border-rose-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <ServicesMarketplacePageInner />
+    </React.Suspense>
   );
 }

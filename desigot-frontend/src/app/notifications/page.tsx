@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/layout/Navbar";
+import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -91,7 +92,7 @@ export default function NotificationsPage() {
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-black text-ink-primary">Notifications</h1>
                 {unreadCount > 0 && (
-                  <Badge color="danger" size="sm">
+                  <Badge color="error" size="sm">
                     {unreadCount} unread
                   </Badge>
                 )}
@@ -150,7 +151,7 @@ export default function NotificationsPage() {
               <Card
                 key={notif.id}
                 onClick={() => {
-                  if (!notif.read_at) {
+                  if (!notif.is_read) {
                     markAsRead.mutate(notif.id);
                   }
                   if (notif.action_url) {
@@ -158,7 +159,7 @@ export default function NotificationsPage() {
                   }
                 }}
                 className={`p-4 sm:p-5 transition-all cursor-pointer flex items-start gap-4 ${
-                  !notif.read_at
+                  !notif.is_read
                     ? "bg-white border-brand/30 shadow-xs"
                     : "bg-surface-50/70 border-border opacity-85"
                 }`}
@@ -169,7 +170,7 @@ export default function NotificationsPage() {
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2 mb-1">
-                    <h3 className={`text-sm ${!notif.read_at ? "font-bold text-ink-primary" : "font-medium text-ink-secondary"}`}>
+                    <h3 className={`text-sm ${!notif.is_read ? "font-bold text-ink-primary" : "font-medium text-ink-secondary"}`}>
                       {notif.title}
                     </h3>
                     <span className="text-[11px] text-ink-tertiary whitespace-nowrap">
@@ -183,7 +184,7 @@ export default function NotificationsPage() {
                 </div>
 
                 <div className="flex items-center gap-1 self-center">
-                  {!notif.read_at && (
+                  {!notif.is_read && (
                     <button
                       type="button"
                       onClick={(e) => {
@@ -210,6 +211,7 @@ export default function NotificationsPage() {
           </div>
         )}
       </main>
+      <Footer />
     </div>
   );
 }
